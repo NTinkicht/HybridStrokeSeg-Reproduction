@@ -10,7 +10,12 @@ from pathlib import Path
 
 import numpy as np
 
-from hybridstrokeseg.data import discover_isles2022_cases, geometry_equal, geometry_signature, load_volume
+from hybridstrokeseg.data import (
+    discover_isles2022_cases,
+    geometry_equal,
+    geometry_signature,
+    load_volume,
+)
 from hybridstrokeseg.metrics_isles2022 import evaluate_isles2022
 from hybridstrokeseg.nnunet import nnunet_case_id
 
