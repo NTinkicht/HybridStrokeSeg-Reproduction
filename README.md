@@ -30,11 +30,17 @@ You do not need Git or a local Python installation.
 
 This notebook downloads and verifies the historical dataset, validates the 28 labeled SISS cases, exercises the reconstructed nine features, and can run both a quick smoke experiment and the full classical reproduction.
 
-### ISLES 2022 modernization
+### ISLES 2022 modernization audit
 
 [![Open ISLES 2022 audit in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/02_modernize_isles2022.ipynb)
 
 This notebook downloads the public 250-case ISLES 2022 training release, verifies its published checksum, discovers the BIDS-style cases and audits whether ADC, FLAIR and lesion masks already share the DWI voxel grid before any multimodal 3-D training is attempted.
+
+### First modern baseline: nnU-Net v2.8.1 on DWI + ADC
+
+[![Open nnU-Net baseline in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/03_nnunet_isles2022_dwi_adc.ipynb)
+
+This notebook prepares a geometry-gated DWI+ADC nnU-Net v2 experiment, runs dataset integrity verification and preprocessing, installs the repository's deterministic patient-level 5-fold split, and provides fold-training/model-selection commands. Full five-fold training is intentionally not auto-started because it is an expensive GPU experiment.
 
 ## Historical reproduction implementation
 
@@ -61,12 +67,14 @@ The modernization track now contains:
 - verified downloader for the public ISLES 2022 release from Zenodo;
 - BIDS-style DWI/ADC/FLAIR/mask case discovery;
 - voxel-grid geometry auditing for every modality against DWI;
-- a patient-level validation protocol centered on 5-fold cross-validation;
+- deterministic patient-level 5-fold cross-validation;
 - the official ISLES 2022 primary metrics: Dice, absolute volume difference, absolute lesion-count difference and lesion-wise F1;
-- nnU-Net v2 as the primary modern baseline, with MedNeXt reserved for a compute-matched secondary comparison;
+- geometry-gated nnU-Net v2 dataset staging and prediction evaluation;
+- a pinned **nnU-Net v2.8.1** modern environment and a reproducible DWI+ADC baseline configuration;
+- MedNeXt reserved for a later compute-matched secondary comparison;
 - a 2026 reference-refresh map including ISLES 2015, ISLES 2022, nnU-Net, nnU-Net Revisited, MedNeXt, DeepISLES, WHO 2025 and the World Stroke Organization 2025 fact sheet.
 
-Read `docs/modernization_protocol.md` and `docs/reference_refresh.md` before building the modern training pipeline.
+Read `docs/modernization_protocol.md` and `docs/reference_refresh.md` before interpreting the modern experiments.
 
 ## Historical reproduction commands
 
@@ -119,10 +127,37 @@ python scripts/audit_isles2022.py \
 
 The public ISLES 2022 release is distributed in native space. A geometry mismatch is therefore not treated as a dataset error; it is a signal that registration/resampling must be explicit before a multimodal 3-D model is trained.
 
+## First modern baseline commands
+
+Install the pinned modern environment:
+
+```bash
+python -m pip install -e '.[modern]'
+```
+
+Stage DWI+ADC only if both channels and the label pass the DWI-grid geometry gate:
+
+```bash
+python scripts/stage_isles2022_nnunet.py \
+  data/raw/isles2022 \
+  "$nnUNet_raw" \
+  --dataset-id 501 \
+  --dataset-name ISLES2022_DWI_ADC \
+  --channels dwi adc
+```
+
+Then use nnU-Net's integrity check and 3-D full-resolution planner:
+
+```bash
+nnUNetv2_plan_and_preprocess -d 501 --verify_dataset_integrity -c 3d_fullres
+```
+
+Train folds 0-4 with `--npz`; the exact protocol is recorded in `configs/isles2022_nnunet_dwi_adc.json` and demonstrated in `notebooks/03_nnunet_isles2022_dwi_adc.ipynb`.
+
 ## Data safety
 
 Patient data, medical images, model checkpoints and local experiment outputs are ignored by Git and must not be committed to this public repository.
 
 ## Next milestone
 
-Run the real ISLES 2022 geometry audit, implement and validate deterministic registration only where needed, convert the aligned dataset into nnU-Net v2 format, and launch patient-level 5-fold modern baseline experiments. The historical reproduction remains frozen as a separate track.
+Execute the real ISLES 2022 audit and DWI+ADC nnU-Net baseline. FLAIR will be added only after its geometry is checked and, if needed, a deterministic registration pipeline is validated. The historical reproduction remains frozen as a separate track.
