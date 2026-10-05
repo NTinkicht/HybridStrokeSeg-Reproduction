@@ -11,13 +11,13 @@ from .isles2022 import (
 )
 
 __all__ = [
-    "SISSCase",
-    "discover_siss_cases",
-    "load_volume",
     "ISLES22Case",
-    "discover_isles2022_cases",
-    "geometry_signature",
-    "geometry_equal",
+    "SISSCase",
     "case_geometry_report",
+    "discover_isles2022_cases",
+    "discover_siss_cases",
+    "geometry_equal",
+    "geometry_signature",
+    "load_volume",
     "summarize_geometry",
 ]
