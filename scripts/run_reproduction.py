@@ -24,6 +24,7 @@ from hybridstrokeseg.models import (
 from hybridstrokeseg.pipeline import prepare_slice, restore_slice_prediction, select_slice_index
 from hybridstrokeseg.preprocessing import PreprocessConfig
 from hybridstrokeseg.sampling import balanced_binary_sample
+from hybridstrokeseg.scg_mlp import make_scg_mlp
 from hybridstrokeseg.splits import make_patient_split
 
 
@@ -55,8 +56,22 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--run-window", type=int, default=25)
     parser.add_argument("--close-radius", type=int, default=1)
     parser.add_argument("--models", nargs="+", choices=("mlp", "svm"), default=("mlp", "svm"))
-    parser.add_argument("--mlp-solver", choices=("lbfgs", "adam", "sgd"), default="lbfgs")
+    parser.add_argument(
+        "--mlp-solver",
+        choices=("scg", "lbfgs", "adam", "sgd"),
+        default="scg",
+        help="SCG matches the optimizer named in the manuscript; other choices are sensitivities.",
+    )
+    parser.add_argument(
+        "--mlp-loss",
+        choices=("cross_entropy", "mse"),
+        default="cross_entropy",
+        help="Loss is not reported by the manuscript; applies to the reconstructed SCG network.",
+    )
     parser.add_argument("--mlp-max-iter", type=int, default=500)
+    parser.add_argument("--mlp-min-grad", type=float, default=1e-6)
+    parser.add_argument("--scg-sigma", type=float, default=5.0e-5)
+    parser.add_argument("--scg-lambda", type=float, default=5.0e-7)
     parser.add_argument("--svm-c", type=float, default=1.0)
     parser.add_argument("--svm-gamma", default="scale")
     return parser.parse_args()
@@ -165,15 +180,26 @@ def main() -> int:
 
     models = {}
     if "mlp" in args.models:
-        models["mlp"] = make_mlp(
-            MLPConfig(
+        if args.mlp_solver == "scg":
+            models["mlp"] = make_scg_mlp(
                 hidden_layers=(100, 100, 100),
-                activation="logistic",
-                solver=args.mlp_solver,
+                loss=args.mlp_loss,
                 max_iter=args.mlp_max_iter,
+                min_grad=args.mlp_min_grad,
+                sigma=args.scg_sigma,
+                lambda_initial=args.scg_lambda,
                 random_state=args.seed,
             )
-        )
+        else:
+            models["mlp"] = make_mlp(
+                MLPConfig(
+                    hidden_layers=(100, 100, 100),
+                    activation="logistic",
+                    solver=args.mlp_solver,
+                    max_iter=args.mlp_max_iter,
+                    random_state=args.seed,
+                )
+            )
     if "svm" in args.models:
         models["svm"] = make_rbf_svm(
             SVMConfig(C=args.svm_c, gamma=parse_gamma(args.svm_gamma))
@@ -241,6 +267,7 @@ def main() -> int:
         encoding="utf-8",
     )
 
+    scg_enabled = args.mlp_solver == "scg"
     metadata = {
         "dataset": "ISLES 2015 SISS",
         "protocol": args.protocol,
@@ -255,10 +282,19 @@ def main() -> int:
         "mlp": {
             "reported_optimizer": "scaled conjugate gradient",
             "implemented_optimizer": args.mlp_solver,
-            "optimizer_exact_match": False,
+            "optimizer_exact_match": scg_enabled,
             "hidden_layers": [100, 100, 100],
-            "activation": "logistic",
+            "activation": "sigmoid" if scg_enabled else "logistic",
+            "output_units": 2 if scg_enabled else 1,
+            "paper_output_encoding": "lesion=[1,0], non-lesion=[0,1]" if scg_enabled else None,
+            "loss": args.mlp_loss if scg_enabled else "scikit-learn log-loss",
+            "loss_reported_by_manuscript": False,
+            "feature_scaling": "StandardScaler (reconstruction choice)",
+            "weight_initialization": "Xavier uniform (reconstruction choice)" if scg_enabled else "scikit-learn default",
             "max_iter": args.mlp_max_iter,
+            "min_grad": args.mlp_min_grad if scg_enabled else None,
+            "scg_sigma": args.scg_sigma if scg_enabled else None,
+            "scg_lambda_initial": args.scg_lambda if scg_enabled else None,
         },
         "svm": {
             "kernel": "rbf",
