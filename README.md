@@ -9,27 +9,36 @@ This repository has two deliberately separated tracks:
 1. **Historical reproduction**: reconstruct the paper's handcrafted 9-feature pixel-classification pipeline with an MLP and RBF-SVM.
 2. **Modernization**: evaluate contemporary 3D stroke-lesion segmentation baselines and updated datasets without mixing their results with the historical reproduction.
 
-## Important dataset note
+## Important dataset correction
 
 The manuscript repeatedly refers to "ISLES 2022", but the reported dataset characteristics (28 training subjects; FLAIR, T1, T2 and DWI; co-registration to FLAIR) correspond to the **ISLES 2015 SISS** challenge, not the actual ISLES 2022 dataset.
 
 Accordingly:
 
 - the reproduction track targets **ISLES 2015 SISS**;
-- ISLES 2022 will be used only in the modernization track;
-- reconstruction assumptions for underspecified paper details are explicitly documented and configurable.
+- the modernization track targets the real **ISLES 2022** public training release;
+- historical and modern results are never mixed into one benchmark table as if they were directly comparable;
+- reconstruction assumptions for underspecified manuscript details are explicitly documented and configurable.
 
 ## Run in Google Colab
 
-You do not need Git or a local Python installation. Open the notebook in your browser:
+You do not need Git or a local Python installation.
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/01_reproduce_isles2015.ipynb)
+### Historical ISLES 2015 reproduction
 
-The notebook downloads and verifies the historical dataset, validates the 28 labeled SISS cases, exercises the reconstructed nine features, and can run both a quick smoke experiment and the full classical reproduction.
+[![Open historical reproduction in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/01_reproduce_isles2015.ipynb)
 
-## Current implementation
+This notebook downloads and verifies the historical dataset, validates the 28 labeled SISS cases, exercises the reconstructed nine features, and can run both a quick smoke experiment and the full classical reproduction.
 
-The repository now contains:
+### ISLES 2022 modernization
+
+[![Open ISLES 2022 audit in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/02_modernize_isles2022.ipynb)
+
+This notebook downloads the public 250-case ISLES 2022 training release, verifies its published checksum, discovers the BIDS-style cases and audits whether ADC, FLAIR and lesion masks already share the DWI voxel grid before any multimodal 3-D training is attempted.
+
+## Historical reproduction implementation
+
+The repository contains:
 
 - robust ISLES 2015 SISS discovery/loading for NIfTI/MHA/MHD files;
 - the reconstructed 9-feature FLAIR descriptor;
@@ -45,9 +54,23 @@ The repository now contains:
 
 See `docs/reconstruction_assumptions.md` before interpreting any numerical result. The original source code is unavailable, so ambiguous details are treated as reconstruction assumptions rather than silently attributed to the authors.
 
-## Reproduction commands
+## Modernization implementation
 
-After the dataset has been extracted, the paper-like reconstruction is:
+The modernization track now contains:
+
+- verified downloader for the public ISLES 2022 release from Zenodo;
+- BIDS-style DWI/ADC/FLAIR/mask case discovery;
+- voxel-grid geometry auditing for every modality against DWI;
+- a patient-level validation protocol centered on 5-fold cross-validation;
+- the official ISLES 2022 primary metrics: Dice, absolute volume difference, absolute lesion-count difference and lesion-wise F1;
+- nnU-Net v2 as the primary modern baseline, with MedNeXt reserved for a compute-matched secondary comparison;
+- a 2026 reference-refresh map including ISLES 2015, ISLES 2022, nnU-Net, nnU-Net Revisited, MedNeXt, DeepISLES, WHO 2025 and the World Stroke Organization 2025 fact sheet.
+
+Read `docs/modernization_protocol.md` and `docs/reference_refresh.md` before building the modern training pipeline.
+
+## Historical reproduction commands
+
+After the ISLES 2015 dataset has been extracted, the paper-like reconstruction is:
 
 ```bash
 python scripts/run_reproduction.py \
@@ -73,7 +96,7 @@ The manuscript says that one FLAIR slice per patient was used but does not state
 
 The paper also reports **scaled conjugate-gradient** MLP training. scikit-learn does not provide SCG, so the Python implementation currently uses LBFGS by default. The architecture and sigmoid activation match the manuscript, but the optimizer does not; this mismatch is automatically written to `experiment_metadata.json`.
 
-## Outputs
+## Historical outputs
 
 Each run writes:
 
@@ -84,10 +107,22 @@ Each run writes:
 
 The split is performed at patient level before any pixel sampling, preventing train/test voxel leakage.
 
+## ISLES 2022 data audit
+
+After extracting the public modern dataset:
+
+```bash
+python scripts/audit_isles2022.py \
+  data/raw/isles2022 \
+  --json outputs/isles2022_geometry.json
+```
+
+The public ISLES 2022 release is distributed in native space. A geometry mismatch is therefore not treated as a dataset error; it is a signal that registration/resampling must be explicit before a multimodal 3-D model is trained.
+
 ## Data safety
 
 Patient data, medical images, model checkpoints and local experiment outputs are ignored by Git and must not be committed to this public repository.
 
 ## Next milestone
 
-Run the historical experiment in Colab, inspect the actual results, perform sensitivity analysis over the missing manuscript details, and only then decide whether the reported Dice values have been reproduced. The modernization track will remain separate and will use contemporary 3D models and datasets.
+Run the real ISLES 2022 geometry audit, implement and validate deterministic registration only where needed, convert the aligned dataset into nnU-Net v2 format, and launch patient-level 5-fold modern baseline experiments. The historical reproduction remains frozen as a separate track.

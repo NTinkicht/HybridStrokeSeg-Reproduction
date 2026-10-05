@@ -5,7 +5,7 @@ from hybridstrokeseg.models import MLPConfig, SVMConfig, make_mlp, make_rbf_svm
 from hybridstrokeseg.pipeline import prepare_slice, restore_slice_prediction, select_slice_index
 from hybridstrokeseg.preprocessing import PreprocessConfig, preprocess_flair
 from hybridstrokeseg.sampling import balanced_binary_sample
-from hybridstrokeseg.splits import make_patient_split
+from hybridstrokeseg.splits import make_patient_kfolds, make_patient_split
 
 
 def test_patient_split_is_deterministic_and_disjoint():
@@ -16,6 +16,23 @@ def test_patient_split_is_deterministic_and_disjoint():
     assert len(split_a.train_ids) == 19
     assert len(split_a.test_ids) == 9
     assert set(split_a.train_ids).isdisjoint(split_a.test_ids)
+
+
+def test_patient_kfolds_are_deterministic_exhaustive_and_disjoint():
+    ids = [f"case-{index:03d}" for index in range(250)]
+    folds_a = make_patient_kfolds(ids, n_splits=5, seed=11)
+    folds_b = make_patient_kfolds(ids, n_splits=5, seed=11)
+    assert folds_a == folds_b
+    assert len(folds_a) == 5
+
+    seen_validation: list[str] = []
+    for fold in folds_a:
+        assert len(fold.validation_ids) == 50
+        assert len(fold.train_ids) == 200
+        assert set(fold.train_ids).isdisjoint(fold.validation_ids)
+        seen_validation.extend(fold.validation_ids)
+
+    assert sorted(seen_validation) == sorted(ids)
 
 
 def test_balanced_binary_sample_is_exactly_balanced():
