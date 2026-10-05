@@ -6,8 +6,8 @@ repository while using NumPy/SciPy APIs that remain current in modern Python.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from typing import Sequence
 
 import numpy as np
 from scipy import ndimage
