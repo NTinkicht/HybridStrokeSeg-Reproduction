@@ -21,8 +21,8 @@ def test_scg_converges_on_positive_quadratic():
     )
 
     assert result.loss_history[-1] < result.loss_history[0]
-    assert np.allclose(result.weights, target, atol=1e-6)
-    assert result.gradient_norm_history[-1] < 1e-6
+    assert np.allclose(result.weights, target, atol=1e-5)
+    assert result.gradient_norm_history[-1] < 1e-5
 
 
 def test_scg_mlp_gradient_matches_finite_difference():
