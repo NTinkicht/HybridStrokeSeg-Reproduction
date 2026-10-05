@@ -25,21 +25,64 @@ You do not need Git or a local Python installation. Open the notebook in your br
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/01_reproduce_isles2015.ipynb)
 
-The notebook downloads the organizer re-archive, verifies the archive checksum, discovers the labeled SISS cases, loads a FLAIR volume and lesion mask, and exercises the reconstructed nine-feature extractor.
+The notebook downloads and verifies the historical dataset, validates the 28 labeled SISS cases, exercises the reconstructed nine features, and can run both a quick smoke experiment and the full classical reproduction.
 
 ## Current implementation
 
 The repository now contains:
 
-- a robust ISLES 2015 SISS dataset discovery/loading layer for NIfTI/MHA/MHD files;
-- a clean-room 9-feature extractor using the paper-stated 3x3 neighborhood, four directions, 1x25 window and threshold 20;
-- explicit configuration for ambiguous reconstruction choices;
-- unit tests for feature geometry, directional edge behavior, modality discovery and complete-case grouping;
-- GitHub Actions CI with `pytest` and `ruff`;
-- a browser-only Colab entry point;
-- documentation distinguishing manuscript statements from inferred implementation choices.
+- robust ISLES 2015 SISS discovery/loading for NIfTI/MHA/MHD files;
+- the reconstructed 9-feature FLAIR descriptor;
+- configurable FLAIR preprocessing alternatives for sensitivity analysis;
+- deterministic patient-level splitting, using 19 train / 9 test cases when all 28 SISS cases are present;
+- balanced lesion/non-lesion sampling, up to the paper's reported 15,000 examples per class;
+- a 3x100 sigmoid MLP reproduction architecture and an RBF-SVM baseline;
+- dilation-then-erosion morphological closing;
+- per-case Dice, precision, recall and continuous-score ROC-AUC;
+- CSV summaries plus JSON split and experiment metadata;
+- unit tests and GitHub Actions CI;
+- a browser-only Colab workflow.
 
-See `docs/reconstruction_assumptions.md` before interpreting any reproduction result. The original source code is unavailable, so ambiguous details are treated as reconstruction assumptions rather than silently attributed to the authors.
+See `docs/reconstruction_assumptions.md` before interpreting any numerical result. The original source code is unavailable, so ambiguous details are treated as reconstruction assumptions rather than silently attributed to the authors.
+
+## Reproduction commands
+
+After the dataset has been extracted, the paper-like reconstruction is:
+
+```bash
+python scripts/run_reproduction.py \
+  --protocol paper-like \
+  --target-per-class 15000 \
+  --models mlp svm \
+  --output-dir outputs/paper_like
+```
+
+A label-independent slice-selection sensitivity experiment is:
+
+```bash
+python scripts/run_reproduction.py \
+  --protocol leakage-free-slice \
+  --target-per-class 15000 \
+  --models mlp svm \
+  --output-dir outputs/leakage_free_slice
+```
+
+### Scientific warning
+
+The manuscript says that one FLAIR slice per patient was used but does not state how it was chosen. The `paper-like` protocol therefore uses the slice with the largest ground-truth lesion area as an explicit reconstruction assumption. This is **oracle, label-informed slice selection** and must not be presented as an unbiased clinical evaluation. The alternative `leakage-free-slice` protocol selects the middle non-empty brain slice without reading the lesion mask, but it can miss lesions.
+
+The paper also reports **scaled conjugate-gradient** MLP training. scikit-learn does not provide SCG, so the Python implementation currently uses LBFGS by default. The architecture and sigmoid activation match the manuscript, but the optimizer does not; this mismatch is automatically written to `experiment_metadata.json`.
+
+## Outputs
+
+Each run writes:
+
+- `per_case_metrics.csv`
+- `summary_metrics.csv`
+- `split.json`
+- `experiment_metadata.json`
+
+The split is performed at patient level before any pixel sampling, preventing train/test voxel leakage.
 
 ## Data safety
 
@@ -47,4 +90,4 @@ Patient data, medical images, model checkpoints and local experiment outputs are
 
 ## Next milestone
 
-Implement the paper-reproduction preprocessing alternatives, deterministic patient-level splits, balanced lesion/non-lesion sampling, MLP and RBF-SVM training, morphology, Dice/precision/recall/AUC evaluation, and sensitivity analysis over the underspecified choices.
+Run the historical experiment in Colab, inspect the actual results, perform sensitivity analysis over the missing manuscript details, and only then decide whether the reported Dice values have been reproduced. The modernization track will remain separate and will use contemporary 3D models and datasets.
