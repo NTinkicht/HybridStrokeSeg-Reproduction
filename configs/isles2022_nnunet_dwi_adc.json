@@ -1,0 +1,25 @@
+{
+  "track": "modernization",
+  "dataset": "ISLES 2022 public training release",
+  "dataset_id": 501,
+  "dataset_name": "ISLES2022_DWI_ADC",
+  "channels": ["dwi", "adc"],
+  "nnunetv2_version": "2.8.1",
+  "configuration": "3d_fullres",
+  "folds": [0, 1, 2, 3, 4],
+  "split_seed": 2026,
+  "train_with_npz": true,
+  "geometry_reference": "dwi",
+  "registration": "none unless the geometry gate fails",
+  "primary_metrics": [
+    "dice",
+    "absolute_volume_difference_ml",
+    "absolute_lesion_count_difference",
+    "lesion_f1"
+  ],
+  "notes": [
+    "This is the first modern baseline because DWI and ADC are the core acute-stroke sequences.",
+    "FLAIR is intentionally excluded until the real dataset geometry audit determines whether explicit registration is required.",
+    "All five patient-level folds must be trained before reporting the cross-validation ensemble as the primary nnU-Net result."
+  ]
+}
