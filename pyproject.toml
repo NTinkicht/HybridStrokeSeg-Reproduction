@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hybridstrokeseg"
-version = "0.2.0"
-description = "Clean-room reproduction of a handcrafted hybrid ischemic-stroke lesion segmentation pipeline."
+version = "0.3.0"
+description = "Reproduction and modernization of hybrid ischemic-stroke lesion segmentation."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -23,6 +23,9 @@ dev = [
 notebook = [
   "matplotlib>=3.8,<4",
   "pandas>=2.2,<3",
+]
+modern = [
+  "nnunetv2==2.8.1",
 ]
 
 [tool.setuptools.packages.find]
