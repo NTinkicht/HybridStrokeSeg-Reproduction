@@ -137,7 +137,7 @@ def stage_isles2022_nnunet(
     if failures:
         preview = "; ".join(
             f"{case_id}: {','.join(items)}"
-            for case_id, items in list(sorted(failures.items()))[:10]
+            for case_id, items in sorted(failures.items())[:10]
         )
         suffix = "" if len(failures) <= 10 else f"; ... {len(failures) - 10} more"
         raise ValueError(
