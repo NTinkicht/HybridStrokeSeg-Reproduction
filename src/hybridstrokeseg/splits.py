@@ -38,7 +38,7 @@ def make_patient_split(
         raise ValueError("test_fraction must lie between 0 and 1")
 
     if train_size is None:
-        test_size = max(1, int(round(len(ids) * test_fraction)))
+        test_size = max(1, round(len(ids) * test_fraction))
         train_size = len(ids) - test_size
     if not 1 <= train_size < len(ids):
         raise ValueError("train_size must leave at least one train and one test case")
