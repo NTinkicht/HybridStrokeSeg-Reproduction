@@ -25,6 +25,8 @@ The audit verifies the expected case layout and records whether ADC, FLAIR and t
 
 The primary development protocol is patient-level 5-fold cross-validation on the 250 public labeled cases. All preprocessing, registration fitting, intensity normalization choices, hyperparameter selection and threshold selection must be learned from training folds only. No voxel, slice or subject from the held-out fold may influence training.
 
+The repository generates deterministic exhaustive folds with 200 training and 50 validation subjects per fold when all 250 public cases are present. Each patient appears in exactly one validation fold.
+
 Report fold-wise and pooled summaries with bootstrap 95% confidence intervals. Keep all split manifests under version control, but never commit patient images.
 
 ## Metrics
@@ -32,11 +34,22 @@ Report fold-wise and pooled summaries with bootstrap 95% confidence intervals. K
 Use the official ISLES 2022 metrics as primary endpoints:
 
 1. Dice score.
-2. Absolute volume difference.
+2. Absolute volume difference in mL.
 3. Absolute lesion-count difference.
-4. Lesion-wise F1 score.
+4. Lesion-wise F1 score using 3-D connected components.
 
-Also report precision, recall and HD95 as secondary descriptive metrics. Define connected-component connectivity, minimum-lesion filtering and empty-mask behavior explicitly.
+The repository mirrors the challenge definitions with 26-connectivity and an empty/empty value of 1.0 for Dice and lesion-wise F1. Also report precision, recall and HD95 as secondary descriptive metrics when the modern training experiments begin.
+
+For nnU-Net-style prediction folders, run:
+
+```bash
+python scripts/evaluate_isles2022.py \
+  /path/to/ISLES-2022 \
+  /path/to/predictions \
+  --output-dir outputs/isles2022_evaluation
+```
+
+The evaluator refuses predictions whose geometry does not match the corresponding ground-truth mask and writes per-case CSV plus aggregate JSON summaries.
 
 ## Baseline hierarchy
 
@@ -47,6 +60,20 @@ nnU-Net v2 is the primary modern baseline. It is maintained as a strong, self-co
 Reference: Isensee F et al. *nnU-Net: a self-configuring method for deep learning-based biomedical image segmentation.* Nature Methods 18, 203-211 (2021). DOI: 10.1038/s41592-020-01008-z.
 
 For current validation practice also cite: Isensee F et al. *nnU-Net Revisited: A Call for Rigorous Validation in 3D Medical Image Segmentation.* MICCAI 2024, 488-498. DOI: 10.1007/978-3-031-72114-4_47.
+
+nnU-Net v2 requires all input channels and the segmentation for a case to share geometry. The repository therefore stages data only after a geometry gate succeeds:
+
+```bash
+python scripts/stage_isles2022_nnunet.py \
+  /path/to/ISLES-2022 \
+  /path/to/nnUNet_raw \
+  --dataset-id 501 \
+  --channels dwi adc flair
+```
+
+The resulting dataset follows the v2 convention `Dataset501_ISLES2022/imagesTr`, `labelsTr`, and `dataset.json`, with four-digit channel suffixes. A deterministic `splits_final.json` is generated for provenance. nnU-Net expects a custom split file in the matching `nnUNet_preprocessed/Dataset501_ISLES2022` folder after planning/preprocessing, so the staged copy must be placed there before training.
+
+If FLAIR or another requested channel is not already on the DWI grid, staging stops rather than silently resampling it.
 
 ### Baseline B: MedNeXt
 
@@ -73,6 +100,8 @@ Before implementing the final multimodal training pipeline:
 - use linear interpolation for intensity images and nearest-neighbor interpolation for masks;
 - visually inspect a stratified sample and record registration failures;
 - include an ablation comparing DWI+ADC against DWI+ADC+FLAIR.
+
+The code deliberately does **not** invent registration parameters before the real public release has been audited. That decision prevents a hidden preprocessing choice from becoming part of the benchmark by accident.
 
 ## Scientific comparison rule
 
