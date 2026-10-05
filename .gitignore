@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Medical imaging data: never commit patient data
+data/raw/
+data/processed/
+*.nii
+*.nii.gz
+*.mha
+*.mhd
+*.nrrd
+*.dcm
+
+# Model artifacts and experiment outputs
+checkpoints/
+outputs/
+runs/
+wandb/
+mlruns/
+*.pt
+*.pth
+*.ckpt
+
+# Local environment
+.env
