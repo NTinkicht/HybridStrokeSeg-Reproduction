@@ -11,14 +11,18 @@ import argparse
 import hashlib
 import shutil
 import sys
+import time
+import urllib.error
 import urllib.request
 import zipfile
 from pathlib import Path
 
 URL = "https://zenodo.org/records/19135955/files/ISLES2015.zip?download=1"
+RECORD_URL = "https://zenodo.org/records/19135955"
 EXPECTED_MD5 = "3b6a2226e3814faf272868a96e4837d1"
 DEFAULT_ARCHIVE = Path("data/raw/ISLES2015.zip")
 DEFAULT_EXTRACT_DIR = Path("data/raw/isles2015")
+RETRY_DELAYS_SECONDS = (5, 15, 30, 60, 120)
 
 
 def md5sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
@@ -29,18 +33,12 @@ def md5sum(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return digest.hexdigest()
 
 
-def download(url: str, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    partial = destination.with_suffix(destination.suffix + ".part")
-
-    print(f"Downloading {url}")
-    print(f"Destination: {destination}")
-
+def _download_once(url: str, partial: Path) -> None:
     request = urllib.request.Request(
         url,
         headers={"User-Agent": "HybridStrokeSeg-Reproduction/1.0"},
     )
-    with urllib.request.urlopen(request) as response, partial.open("wb") as out:
+    with urllib.request.urlopen(request, timeout=60) as response, partial.open("wb") as out:
         total = response.headers.get("Content-Length")
         total_bytes = int(total) if total else None
         copied = 0
@@ -52,11 +50,58 @@ def download(url: str, destination: Path) -> None:
             copied += len(chunk)
             if total_bytes:
                 pct = 100.0 * copied / total_bytes
-                print(f"\r{copied / 2**20:.1f} MiB / {total_bytes / 2**20:.1f} MiB ({pct:.1f}%)", end="")
+                print(
+                    f"\r{copied / 2**20:.1f} MiB / "
+                    f"{total_bytes / 2**20:.1f} MiB ({pct:.1f}%)",
+                    end="",
+                )
         if total_bytes:
             print()
 
-    shutil.move(str(partial), str(destination))
+
+def download(url: str, destination: Path) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    partial = destination.with_suffix(destination.suffix + ".part")
+
+    print(f"Downloading {url}")
+    print(f"Destination: {destination}")
+
+    attempts = len(RETRY_DELAYS_SECONDS) + 1
+    for attempt in range(1, attempts + 1):
+        try:
+            if partial.exists():
+                partial.unlink()
+            _download_once(url, partial)
+            shutil.move(str(partial), str(destination))
+            return
+        except urllib.error.HTTPError as exc:
+            retriable = exc.code in {429, 500, 502, 503, 504}
+            if not retriable or attempt == attempts:
+                raise RuntimeError(
+                    f"Zenodo download failed with HTTP {exc.code}. "
+                    f"Open {RECORD_URL} in a browser and download ISLES2015.zip "
+                    f"manually to {destination}."
+                ) from exc
+            delay = RETRY_DELAYS_SECONDS[attempt - 1]
+            print(
+                f"Zenodo returned HTTP {exc.code}; retrying in {delay}s "
+                f"({attempt}/{attempts})...",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt == attempts:
+                raise RuntimeError(
+                    f"Download failed after {attempts} attempts. "
+                    f"Open {RECORD_URL} in a browser and download ISLES2015.zip "
+                    f"manually to {destination}."
+                ) from exc
+            delay = RETRY_DELAYS_SECONDS[attempt - 1]
+            print(
+                f"Network error; retrying in {delay}s ({attempt}/{attempts})...",
+                file=sys.stderr,
+            )
+            time.sleep(delay)
 
 
 def verify(path: Path) -> None:
