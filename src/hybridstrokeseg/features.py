@@ -14,6 +14,7 @@ import numpy as np
 from scipy import ndimage
 
 Direction = tuple[int, int]
+RunMode = Literal["threshold_count", "centered_run", "max_run"]
 
 DIRECTIONS: tuple[Direction, ...] = (
     (0, 1),   # horizontal
@@ -37,19 +38,25 @@ class FeatureConfig:
       - "neighbourhood" is represented by one 3x3 box mean so that the total
         dimensionality remains nine;
       - "weighted local mean" uses a normalized 3x3 binomial kernel;
-      - the directional descriptor is the count of values >= threshold in a
-        centered directional window;
+      - the exact directional descriptor is not specified by the paper. Three
+        explicit sensitivity variants are available:
+          * ``threshold_count``: number of thresholded samples in the window;
+          * ``centered_run``: contiguous thresholded run through the center;
+          * ``max_run``: longest thresholded run anywhere in the window;
       - spatial coordinates are raw row/column indices by default.
     """
 
     threshold: float = 20.0
     run_window: int = 25
+    run_mode: RunMode = "threshold_count"
     coordinate_mode: Literal["raw", "normalized"] = "raw"
     boundary_mode: Literal["nearest", "reflect", "constant"] = "nearest"
 
     def __post_init__(self) -> None:
         if self.run_window < 1 or self.run_window % 2 == 0:
             raise ValueError("run_window must be a positive odd integer")
+        if self.run_mode not in {"threshold_count", "centered_run", "max_run"}:
+            raise ValueError("Unsupported run_mode")
         if self.coordinate_mode not in {"raw", "normalized"}:
             raise ValueError("coordinate_mode must be 'raw' or 'normalized'")
 
@@ -119,6 +126,22 @@ def _shift_with_constant(
     return out
 
 
+def _validate_directional_inputs(
+    image: np.ndarray,
+    direction: Direction,
+    window: int,
+) -> tuple[np.ndarray, int, int, int]:
+    image = np.asarray(image)
+    if image.ndim != 2:
+        raise ValueError("directional descriptor expects a 2-D image")
+    if window < 1 or window % 2 == 0:
+        raise ValueError("window must be a positive odd integer")
+    dr, dc = direction
+    if (dr, dc) == (0, 0):
+        raise ValueError("direction cannot be (0, 0)")
+    return image, dr, dc, window // 2
+
+
 def directional_threshold_count(
     image: np.ndarray,
     direction: Direction,
@@ -128,27 +151,102 @@ def directional_threshold_count(
 ) -> np.ndarray:
     """Count thresholded samples in a centered directional window.
 
-    This is a clean-room interpretation of the paper's underspecified
-    "run-length" feature. It is deliberately implemented as a configurable
-    threshold-count descriptor rather than claiming to be a standard GLRLM.
-
-    Values outside the image are treated as below threshold.
+    This is the first clean-room interpretation implemented for the paper's
+    underspecified "run-length" feature. Values outside the image are treated
+    as below threshold.
     """
-    image = np.asarray(image)
-    if image.ndim != 2:
-        raise ValueError("directional_threshold_count expects a 2-D image")
-    if window < 1 or window % 2 == 0:
-        raise ValueError("window must be a positive odd integer")
-    dr, dc = direction
-    if (dr, dc) == (0, 0):
-        raise ValueError("direction cannot be (0, 0)")
-
+    image, dr, dc, radius = _validate_directional_inputs(image, direction, window)
     high = image >= threshold
-    radius = window // 2
     counts = np.zeros(image.shape, dtype=np.float32)
     for offset in range(-radius, radius + 1):
         counts += _shift_with_constant(high, offset * dr, offset * dc).astype(np.float32)
     return counts
+
+
+def directional_centered_run(
+    image: np.ndarray,
+    direction: Direction,
+    *,
+    threshold: float = 20.0,
+    window: int = 25,
+) -> np.ndarray:
+    """Return the contiguous thresholded run length passing through each pixel.
+
+    A pixel below threshold receives zero. For a pixel above threshold, the run
+    expands in both directions until the first below-threshold sample or the
+    edge of the centered window. This is a plausible but unverified reading of
+    the manuscript's use of the term "run-length".
+    """
+    image, dr, dc, radius = _validate_directional_inputs(image, direction, window)
+    high = image >= threshold
+    counts = high.astype(np.float32)
+    active_forward = high.copy()
+    active_backward = high.copy()
+
+    for step in range(1, radius + 1):
+        active_forward &= _shift_with_constant(high, step * dr, step * dc)
+        active_backward &= _shift_with_constant(high, -step * dr, -step * dc)
+        counts += active_forward.astype(np.float32)
+        counts += active_backward.astype(np.float32)
+    return counts
+
+
+def directional_max_run(
+    image: np.ndarray,
+    direction: Direction,
+    *,
+    threshold: float = 20.0,
+    window: int = 25,
+) -> np.ndarray:
+    """Return the longest thresholded run anywhere in the directional window.
+
+    This variant tests another plausible reading of the manuscript phrase that
+    a maximum value is assigned within the 1x25 directional support. It is an
+    explicit sensitivity assumption, not a claim about the unpublished code.
+    """
+    image, dr, dc, radius = _validate_directional_inputs(image, direction, window)
+    high = image >= threshold
+    current = np.zeros(image.shape, dtype=np.float32)
+    maximum = np.zeros(image.shape, dtype=np.float32)
+
+    for offset in range(-radius, radius + 1):
+        sample = _shift_with_constant(high, offset * dr, offset * dc)
+        current = np.where(sample, current + 1.0, 0.0).astype(np.float32, copy=False)
+        maximum = np.maximum(maximum, current)
+    return maximum
+
+
+def directional_run_descriptor(
+    image: np.ndarray,
+    direction: Direction,
+    *,
+    threshold: float,
+    window: int,
+    mode: RunMode,
+) -> np.ndarray:
+    """Dispatch one documented directional reconstruction variant."""
+    if mode == "threshold_count":
+        return directional_threshold_count(
+            image,
+            direction,
+            threshold=threshold,
+            window=window,
+        )
+    if mode == "centered_run":
+        return directional_centered_run(
+            image,
+            direction,
+            threshold=threshold,
+            window=window,
+        )
+    if mode == "max_run":
+        return directional_max_run(
+            image,
+            direction,
+            threshold=threshold,
+            window=window,
+        )
+    raise ValueError(f"Unknown run mode: {mode}")
 
 
 def extract_nine_features(
@@ -182,11 +280,12 @@ def extract_nine_features(
     neighborhood = _box_mean(image, cfg.boundary_mode)
     weighted = _weighted_local_mean(image, cfg.boundary_mode)
     run_features = [
-        directional_threshold_count(
+        directional_run_descriptor(
             image,
             direction,
             threshold=cfg.threshold,
             window=cfg.run_window,
+            mode=cfg.run_mode,
         )
         for direction in DIRECTIONS
     ]
