@@ -44,6 +44,16 @@ def _is_image(path: Path) -> bool:
     return any(name.endswith(suffix) for suffix in IMAGE_SUFFIXES)
 
 
+def _is_archive_metadata(path: Path) -> bool:
+    """Return whether ``path`` is packaging metadata rather than medical-image data.
+
+    The organizer re-archive contains macOS AppleDouble/resource-fork entries
+    below ``__MACOSX`` with filenames beginning ``._``. They can retain medical
+    image suffixes such as ``.mha`` but are not readable medical images.
+    """
+    return any(part == "__MACOSX" for part in path.parts) or path.name.startswith("._")
+
+
 def _token_text(path: Path) -> str:
     return "/".join(part.lower() for part in path.parts[-4:])
 
@@ -96,6 +106,7 @@ def discover_siss_cases(
 
     Incomplete groups are ignored by default so the same function can scan a
     full historical archive that may also contain unlabeled challenge material.
+    macOS resource-fork metadata from the historical re-archive is ignored.
     """
     dataset_root = Path(root)
     if not dataset_root.exists():
@@ -103,7 +114,11 @@ def discover_siss_cases(
 
     grouped: dict[Path, dict[str, Path]] = {}
 
-    for path in sorted(p for p in dataset_root.rglob("*") if p.is_file() and _is_image(p)):
+    for path in sorted(
+        p
+        for p in dataset_root.rglob("*")
+        if p.is_file() and _is_image(p) and not _is_archive_metadata(p)
+    ):
         modality = infer_modality(path)
         if modality is None:
             continue
