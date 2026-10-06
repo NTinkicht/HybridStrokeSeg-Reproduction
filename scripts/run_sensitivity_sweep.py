@@ -14,7 +14,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-
 EXPERIMENTS = (
     {
         "name": "minimal_count_t20",
