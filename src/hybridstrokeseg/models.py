@@ -8,8 +8,10 @@ from typing import Literal
 import numpy as np
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.svm import SVC
+
+ScalerMode = Literal["standard", "minmax", "none"]
 
 
 @dataclass(frozen=True)
@@ -29,6 +31,7 @@ class SVMConfig:
 
     C: float = 1.0
     gamma: str | float = "scale"
+    scaler: ScalerMode = "standard"
 
 
 def make_mlp(config: MLPConfig | None = None) -> Pipeline:
@@ -48,11 +51,27 @@ def make_mlp(config: MLPConfig | None = None) -> Pipeline:
     return Pipeline([("scale", StandardScaler()), ("model", model)])
 
 
+def _svm_scaler(mode: ScalerMode):
+    """Return the declared SVM feature transform.
+
+    The manuscript does not report whether feature scaling was applied. Keeping
+    this explicit lets reproduction experiments test common alternatives without
+    silently changing the classifier.
+    """
+    if mode == "standard":
+        return StandardScaler()
+    if mode == "minmax":
+        return MinMaxScaler()
+    if mode == "none":
+        return "passthrough"
+    raise ValueError(f"Unknown SVM scaler mode: {mode}")
+
+
 def make_rbf_svm(config: SVMConfig | None = None) -> Pipeline:
-    """Build a scaled RBF-SVM using libsvm's SMO-family optimization."""
+    """Build an RBF-SVM with an explicit reconstruction-time scaling choice."""
     cfg = config or SVMConfig()
     model = SVC(kernel="rbf", C=cfg.C, gamma=cfg.gamma)
-    return Pipeline([("scale", StandardScaler()), ("model", model)])
+    return Pipeline([("scale", _svm_scaler(cfg.scaler)), ("model", model)])
 
 
 def continuous_scores(model: Pipeline, X: np.ndarray) -> np.ndarray:
