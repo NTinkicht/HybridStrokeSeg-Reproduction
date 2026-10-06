@@ -71,6 +71,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--mlp-max-iter", type=int, default=500)
     parser.add_argument("--svm-c", type=float, default=1.0)
     parser.add_argument("--svm-gamma", default="scale")
+    parser.add_argument(
+        "--svm-scaler",
+        choices=("standard", "minmax", "none"),
+        default="standard",
+        help="Feature scaling is not specified by the manuscript, so keep it explicit.",
+    )
     return parser.parse_args()
 
 
@@ -189,7 +195,11 @@ def main() -> int:
         )
     if "svm" in args.models:
         models["svm"] = make_rbf_svm(
-            SVMConfig(C=args.svm_c, gamma=parse_gamma(args.svm_gamma))
+            SVMConfig(
+                C=args.svm_c,
+                gamma=parse_gamma(args.svm_gamma),
+                scaler=args.svm_scaler,
+            )
         )
 
     for name, model in models.items():
@@ -277,7 +287,7 @@ def main() -> int:
             "kernel": "rbf",
             "C": args.svm_c,
             "gamma": args.svm_gamma,
-            "feature_scaling": "StandardScaler",
+            "feature_scaling": args.svm_scaler,
         },
     }
     (args.output_dir / "experiment_metadata.json").write_text(

@@ -19,13 +19,13 @@ These values are **not a successful numerical reproduction** of the manuscript. 
 
 The largest unresolved candidates are:
 
-- the exact patient split and any voxel-level split behavior;
 - the original single-slice selection rule;
 - true histogram specification rather than simple intensity rescaling;
+- SVM hyperparameters and feature scaling;
 - the exact 3x3 neighborhood and weighted-local-mean definitions;
 - the unavailable scaled-conjugate-gradient MLP training behavior;
-- SVM hyperparameters and feature scaling;
 - morphology structuring element / radius;
+- possible voxel-level split behavior implied by the manuscript's contradictory 70/15/15 wording;
 - the exact mathematical definition of the four-direction "run-length" feature.
 
 ### Leakage-free slice sensitivity
@@ -53,29 +53,53 @@ A 12-condition, 2,000-per-class SVM screen tested two preprocessing families and
 
 The main conclusion is negative but useful: **simple 0-255 rescaling and the three tested run-length interpretations do not explain the manuscript's reported Dice of 0.56 for the SVM.** The paper-minimal variants were actually better than the robust-uint8 variants in this screen. The two contiguous-run interpretations only improved the quick baseline by about 0.016-0.017 Dice.
 
-Therefore the next investigation should move away from trying more threshold values and focus on larger protocol uncertainties.
+## Completed diagnostic: undisclosed 19/9 patient split
 
-## Next diagnostic: undisclosed 19/9 patient split
+A predeclared 20-seed screen repeated the same leakage-safe 19-train / 9-test SVM reconstruction with 2,000 lesion and 2,000 non-lesion training pixels per run. No seed was selected after inspection.
 
-The manuscript gives a 19/9 case-level split but does not identify the patient IDs or random seed. With only 28 cases and very heterogeneous lesion sizes, a single arbitrary split can have a large effect on mean Dice.
+The distribution of mean Dice across the 20 patient splits was:
 
-Run the predeclared patient-split sensitivity study with:
+| Statistic | Mean Dice |
+| --- | ---: |
+| Mean ± SD across splits | **0.237 ± 0.077** |
+| Median | **0.238** |
+| 2.5th-97.5th percentile | **0.107-0.373** |
+| Observed range | **0.087-0.388** |
 
-```bash
-python scripts/run_split_sensitivity.py --num-seeds 20
-```
+The manuscript reports SVM Dice **0.56 ± 0.26**. Under the current reconstruction, even the best of the 20 predeclared split seeds reached only **0.388**, so the undisclosed patient split by itself does not explain the reported score. Because this was the quick 2,000-per-class screen rather than the paper-size 15,000-per-class run, this is evidence against split composition as the sole explanation, not a mathematical proof that split composition has no effect.
 
-Every run remains a leakage-safe 19-train / 9-test patient holdout. The script does **not** select a favorable split. It reports the distribution of mean SVM Dice across seeds and writes:
+The experiment writes:
 
 ```text
 outputs/split_sensitivity/split_sensitivity.csv
 outputs/split_sensitivity/split_sensitivity_summary.json
 ```
 
-Interpretation rule:
+## Next diagnostic: SVM scaling, C and gamma
 
-- if the manuscript's 0.56 Dice lies far above the observed split-sensitivity range, the missing patient split cannot plausibly explain the gap by itself;
-- if the distribution is extremely wide and approaches the manuscript value naturally across multiple seeds, split composition becomes a major explanatory factor;
-- regardless of the result, selecting the best seed after inspection is prohibited because that would be score matching rather than reproduction.
+The manuscript says that an RBF-SVM was trained with SMO but does not report feature scaling, the penalty parameter `C`, or the RBF width / `gamma`. These choices can materially alter an RBF-SVM when the nine handcrafted inputs live on very different numerical scales.
 
-After this diagnostic, the remaining priorities are true histogram specification, SVM scaling/hyperparameter sensitivity, morphology, a leakage diagnostic for the contradictory 70/15/15 voxel-split wording, and an exact scaled-conjugate-gradient MLP implementation.
+A predeclared 27-condition screen is now available. It evaluates:
+
+- scaling: `standard`, `minmax`, `none`;
+- `C`: `0.1`, `1`, `10`;
+- `gamma`: `scale`, `0.01`, `0.1`.
+
+All other reconstruction choices stay fixed, including the deterministic 2026 patient split, paper-minimal preprocessing, threshold-count directional feature, raw spatial coordinates, radius-1 morphological closing and 2,000 pixels per class.
+
+Run:
+
+```bash
+python scripts/run_svm_sensitivity.py
+```
+
+It writes:
+
+```text
+outputs/svm_sensitivity/svm_sensitivity.csv
+outputs/svm_sensitivity/svm_sensitivity_metadata.json
+```
+
+This is an uncertainty diagnostic, not score matching. A high-scoring configuration is informative only if the improvement is broad and scientifically plausible, not merely because one grid point happens to approach 0.56.
+
+After this diagnostic, the remaining priorities are true histogram specification, morphology sensitivity, a deliberately labeled leakage diagnostic for the contradictory 70/15/15 voxel-split wording, exact neighborhood/weighted-mean reconstruction, and an exact scaled-conjugate-gradient MLP implementation.
