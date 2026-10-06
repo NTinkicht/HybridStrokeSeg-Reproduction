@@ -19,14 +19,14 @@ These values are **not a successful numerical reproduction** of the manuscript. 
 
 The largest unresolved candidates are:
 
-- the manuscript's histogram specification / intensity scale before applying the reported threshold of 20;
-- the exact mathematical definition of the four-direction "run-length" feature;
-- the exact 3x3 neighborhood and weighted-local-mean definitions;
+- the exact patient split and any voxel-level split behavior;
 - the original single-slice selection rule;
+- true histogram specification rather than simple intensity rescaling;
+- the exact 3x3 neighborhood and weighted-local-mean definitions;
 - the unavailable scaled-conjugate-gradient MLP training behavior;
 - SVM hyperparameters and feature scaling;
 - morphology structuring element / radius;
-- the original patient split and any voxel-level split behavior.
+- the exact mathematical definition of the four-direction "run-length" feature.
 
 ### Leakage-free slice sensitivity
 
@@ -39,25 +39,43 @@ Selecting the middle non-empty brain slice without reading the lesion mask reduc
 
 Several selected middle-brain slices contained no lesion, producing undefined AUC values. This confirms that the unknown original slice-selection rule is a major reproducibility issue.
 
-## Next experiment: controlled sensitivity, not score matching
+## Completed diagnostic: intensity scale and directional-feature interpretation
 
-The next step is a preregistered-style diagnostic sweep over two especially important ambiguities:
+A 12-condition, 2,000-per-class SVM screen tested two preprocessing families and three explicit interpretations of the paper's underspecified four-direction descriptor. This was uncertainty analysis, not parameter tuning.
 
-1. intensity preprocessing (`paper_minimal` versus a robust 0-255 mapping, which makes the manuscript's threshold of 20 interpretable on a conventional 8-bit scale);
-2. three explicit directional-feature interpretations: threshold count, contiguous run through the center, and maximum contiguous run within the 1x25 support.
+| Configuration | Dice mean ± SD | AUC |
+| --- | ---: | ---: |
+| paper-minimal + maximum contiguous run, threshold 20 | **0.244 ± 0.298** | 0.788 |
+| paper-minimal + centered contiguous run, threshold 20 | 0.243 ± 0.302 | 0.796 |
+| paper-minimal + threshold count, threshold 20 | 0.227 ± 0.302 | 0.798 |
+| robust 0-255 + best tested variant | 0.213 ± 0.326 | 0.786 |
+| robust 0-255 + worst tested variant | 0.204 ± 0.304 | 0.778 |
 
-The sweep is deliberately framed as uncertainty analysis. A configuration must not be selected merely because its Dice happens to approach the manuscript's reported number.
+The main conclusion is negative but useful: **simple 0-255 rescaling and the three tested run-length interpretations do not explain the manuscript's reported Dice of 0.56 for the SVM.** The paper-minimal variants were actually better than the robust-uint8 variants in this screen. The two contiguous-run interpretations only improved the quick baseline by about 0.016-0.017 Dice.
 
-Run the fast SVM screen with:
+Therefore the next investigation should move away from trying more threshold values and focus on larger protocol uncertainties.
+
+## Next diagnostic: undisclosed 19/9 patient split
+
+The manuscript gives a 19/9 case-level split but does not identify the patient IDs or random seed. With only 28 cases and very heterogeneous lesion sizes, a single arbitrary split can have a large effect on mean Dice.
+
+Run the predeclared patient-split sensitivity study with:
 
 ```bash
-python scripts/run_sensitivity_sweep.py
+python scripts/run_split_sensitivity.py --num-seeds 20
 ```
 
-It writes each experiment separately and creates:
+Every run remains a leakage-safe 19-train / 9-test patient holdout. The script does **not** select a favorable split. It reports the distribution of mean SVM Dice across seeds and writes:
 
 ```text
-outputs/sensitivity_quick/sweep_summary.csv
+outputs/split_sensitivity/split_sensitivity.csv
+outputs/split_sensitivity/split_sensitivity_summary.json
 ```
 
-The most scientifically plausible variants can then be repeated at the full 15,000-per-class setting with both MLP and SVM, followed by morphology and optimizer sensitivity.
+Interpretation rule:
+
+- if the manuscript's 0.56 Dice lies far above the observed split-sensitivity range, the missing patient split cannot plausibly explain the gap by itself;
+- if the distribution is extremely wide and approaches the manuscript value naturally across multiple seeds, split composition becomes a major explanatory factor;
+- regardless of the result, selecting the best seed after inspection is prohibited because that would be score matching rather than reproduction.
+
+After this diagnostic, the remaining priorities are true histogram specification, SVM scaling/hyperparameter sensitivity, morphology, a leakage diagnostic for the contradictory 70/15/15 voxel-split wording, and an exact scaled-conjugate-gradient MLP implementation.
