@@ -21,7 +21,6 @@ The largest unresolved candidates are:
 
 - the original single-slice selection rule;
 - true histogram specification rather than simple intensity rescaling;
-- SVM hyperparameters and feature scaling;
 - the exact 3x3 neighborhood and weighted-local-mean definitions;
 - the unavailable scaled-conjugate-gradient MLP training behavior;
 - morphology structuring element / radius;
@@ -75,31 +74,49 @@ outputs/split_sensitivity/split_sensitivity.csv
 outputs/split_sensitivity/split_sensitivity_summary.json
 ```
 
-## Next diagnostic: SVM scaling, C and gamma
+## Completed diagnostic: SVM scaling, C and gamma
 
-The manuscript says that an RBF-SVM was trained with SMO but does not report feature scaling, the penalty parameter `C`, or the RBF width / `gamma`. These choices can materially alter an RBF-SVM when the nine handcrafted inputs live on very different numerical scales.
+The manuscript says that an RBF-SVM was trained with SMO but does not report feature scaling, the penalty parameter `C`, or the RBF width / `gamma`. A predeclared 27-condition screen tested three scaling modes, three `C` values and three gamma choices while keeping the deterministic 2026 patient split and all other reconstruction settings fixed.
 
-A predeclared 27-condition screen is now available. It evaluates:
+The strongest conditions were:
 
-- scaling: `standard`, `minmax`, `none`;
-- `C`: `0.1`, `1`, `10`;
-- `gamma`: `scale`, `0.01`, `0.1`.
+| Configuration | Dice mean ± SD | AUC |
+| --- | ---: | ---: |
+| no feature scaling, C=1, gamma=scale | **0.322 ± 0.391** | 0.857 |
+| no feature scaling, C=10, gamma=scale | **0.320 ± 0.323** | 0.891 |
+| min-max scaling, C=10, gamma=scale | 0.272 ± 0.304 | 0.828 |
+| standard scaling, C=10, gamma=0.1 | 0.258 ± 0.291 | 0.813 |
+| standard scaling, C=10, gamma=scale | 0.256 ± 0.292 | 0.813 |
+| standard scaling, C=1, gamma=scale | 0.227 ± 0.302 | 0.798 |
 
-All other reconstruction choices stay fixed, including the deterministic 2026 patient split, paper-minimal preprocessing, threshold-count directional feature, raw spatial coordinates, radius-1 morphological closing and 2,000 pixels per class.
+The screen therefore shows that **feature scaling is materially important**, with the two best no-scaling configurations improving the quick baseline by about 0.09 Dice. However, even the strongest predeclared condition reached only **0.322 mean Dice**, still well below the manuscript's reported **0.56**. Ordinary choices of scaling, `C` and `gamma` therefore do not explain the reproduction gap by themselves.
 
-Run:
+This result must not be interpreted as recovery of the original SVM settings. The grid was an uncertainty analysis and the top condition was observed after running the full predeclared screen.
 
-```bash
-python scripts/run_svm_sensitivity.py
-```
-
-It writes:
+The experiment writes:
 
 ```text
 outputs/svm_sensitivity/svm_sensitivity.csv
 outputs/svm_sensitivity/svm_sensitivity_metadata.json
 ```
 
-This is an uncertainty diagnostic, not score matching. A high-scoring configuration is informative only if the improvement is broad and scientifically plausible, not merely because one grid point happens to approach 0.56.
+## Next diagnostic: morphology scale
 
-After this diagnostic, the remaining priorities are true histogram specification, morphology sensitivity, a deliberately labeled leakage diagnostic for the contradictory 70/15/15 voxel-split wording, exact neighborhood/weighted-mean reconstruction, and an exact scaled-conjugate-gradient MLP implementation.
+The manuscript explicitly says that dilation is followed by erosion, which is a morphological closing operation, but it does not report the structuring-element shape or size. The current reconstruction uses a 2-D disk with radius 1.
+
+A predeclared morphology screen is now available. It evaluates disk radii `0, 1, 2, 3, 5`, where radius 0 is the no-postprocessing control. Because the completed SVM diagnostic showed a meaningful interaction with feature scaling, the morphology screen is repeated for two SVM scaling modes: `standard` and `none`. `C=1` and `gamma=scale` remain fixed.
+
+Run:
+
+```bash
+python scripts/run_morphology_sensitivity.py
+```
+
+It writes:
+
+```text
+outputs/morphology_sensitivity/morphology_sensitivity.csv
+outputs/morphology_sensitivity/morphology_sensitivity_metadata.json
+```
+
+This is again an uncertainty diagnostic, not score matching. After morphology, the remaining priorities are true histogram specification, a deliberately labeled leakage diagnostic for the contradictory 70/15/15 voxel-split wording, exact neighborhood/weighted-mean reconstruction, and an exact scaled-conjugate-gradient MLP implementation.
