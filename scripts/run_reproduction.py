@@ -53,6 +53,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--target-per-class", type=int, default=15_000)
     parser.add_argument("--run-threshold", type=float, default=20.0)
     parser.add_argument("--run-window", type=int, default=25)
+    parser.add_argument(
+        "--run-mode",
+        choices=("threshold_count", "centered_run", "max_run"),
+        default="threshold_count",
+        help="Explicit reconstruction variant for the manuscript's underspecified run-length feature.",
+    )
+    parser.add_argument(
+        "--coordinate-mode",
+        choices=("raw", "normalized"),
+        default="raw",
+        help="Sensitivity control for the two spatial-coordinate inputs.",
+    )
     parser.add_argument("--close-radius", type=int, default=1)
     parser.add_argument("--models", nargs="+", choices=("mlp", "svm"), default=("mlp", "svm"))
     parser.add_argument("--mlp-solver", choices=("lbfgs", "adam", "sgd"), default="lbfgs")
@@ -128,7 +140,8 @@ def main() -> int:
     feature_config = FeatureConfig(
         threshold=args.run_threshold,
         run_window=args.run_window,
-        coordinate_mode="raw",
+        run_mode=args.run_mode,
+        coordinate_mode=args.coordinate_mode,
     )
 
     train_X: list[np.ndarray] = []
