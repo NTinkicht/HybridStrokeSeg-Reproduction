@@ -4,7 +4,7 @@
 
 ISLES'24 is a multicenter longitudinal stroke dataset built for prediction of the final post-treatment infarct from pre-interventional acute stroke data.
 
-The current public training release contains 149 labeled patients. The challenge test cohort contains 96 hidden patients.
+The current public training release contains 149 labeled patients. The challenge test cohort contains 96 hidden patients. The current Zenodo v7 archive is `train.7z` (~99 GB), published MD5 `4959a5dd2438d53e3c86d6858484e781`.
 
 The public dataset includes:
 - acute NCCT;
@@ -22,10 +22,24 @@ Primary dataset reference:
 Riedel EO et al. The Ischemic Stroke Lesion Segmentation Challenge (ISLES)'24 Dataset: A Multimodal Stroke Imaging Dataset with Hyperacute CT, Acute Postinterventional MRI, and 3-month Clinical Outcomes. Radiology: Artificial Intelligence.
 
 Dataset record:
-https://zenodo.org/records/16813698
+https://zenodo.org/records/17652035
 
 Official challenge:
 https://isles-24.grand-challenge.org/
+
+
+## Persistent download
+
+Because the current training archive is about 99 GB, store it on persistent storage rather than the ephemeral Colab filesystem.
+
+For a mounted Google Drive:
+
+```bash
+python scripts/download_isles2024.py \
+  --archive "/content/drive/MyDrive/HybridStrokeSeg/ISLES2024/raw/train.7z"
+```
+
+The downloader resumes partial HTTP transfers and verifies the current Zenodo v7 MD5 before declaring the archive ready. If Colab disconnects, rerun the same command; the partial file is retained.
 
 ## Critical task distinction
 
