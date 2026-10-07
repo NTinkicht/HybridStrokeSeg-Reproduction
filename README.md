@@ -59,6 +59,18 @@ python scripts/audit_isles2024.py \
 
 The audit keeps valid acute model inputs separate from follow-up DWI/ADC and outcome information. Follow-up MRI and post-treatment/outcome variables are never permitted as prediction inputs.
 
+
+After the audit passes, stage the first NCCT-only nnU-Net v2 baseline:
+
+```bash
+python scripts/stage_isles2024_nnunet.py \
+  /path/to/ISLES24 \
+  "$nnUNet_raw" \
+  --channels ncct
+```
+
+The resulting deterministic five-fold split is generated from patient IDs only.
+
 ## Historical reproduction implementation
 
 The repository contains:
