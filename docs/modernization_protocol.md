@@ -1,6 +1,6 @@
-# Modernization protocol: ISLES 2022
+# Bridge modernization protocol: real ISLES 2022
 
-This track is intentionally separate from the historical ISLES 2015 reproduction. It is a new, modern benchmark and must not be described as a reproduction of the manuscript's reported Dice values.
+This track is intentionally separate from the historical ISLES 2015 reproduction. It is a real modern MRI benchmark and must not be described as a reproduction of the manuscript's reported Dice values. Under the current project strategy, ISLES 2022 is a **bridge validation track**; ISLES'24 is the primary forward-looking modernization benchmark. See `docs/research_strategy.md` and `docs/isles2024_protocol.md`.
 
 ## Dataset
 
@@ -105,4 +105,4 @@ The code deliberately does **not** invent registration parameters before the rea
 
 ## Scientific comparison rule
 
-Do not compare the ISLES 2015 handcrafted 2-D classifier and the ISLES 2022 3-D deep-learning models as though they were evaluated on the same benchmark. The data, modalities, disease-stage distribution, cohort size, challenge protocol and hidden-test construction are different. Historical results belong in the reproduction track; modern results belong here.
+Do not compare the ISLES 2015 handcrafted 2-D classifier and the ISLES 2022 3-D deep-learning models as though they were evaluated on the same benchmark. The data, modalities, disease-stage distribution, cohort size, challenge protocol and hidden-test construction are different. Historical results belong in the reproduction track. ISLES 2022 results belong to this bridge track, while ISLES'24 final-infarct prediction is reported as a distinct primary modernization task.
