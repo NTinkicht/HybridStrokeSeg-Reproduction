@@ -8,11 +8,13 @@ The manuscript's reference [15] is bibliographically and chronologically inconsi
 
 - Maier O et al. **ISLES 2015 - A public evaluation benchmark for ischemic stroke lesion segmentation from multispectral MRI.** *Medical Image Analysis*. 2017;35:250-269. DOI: 10.1016/j.media.2016.07.009.
 
-For a modernized benchmark section, add rather than substitute:
+For modern benchmark sections, add rather than substitute:
 
 - Hernandez Petzsche MR et al. **ISLES 2022: A multi-center magnetic resonance imaging stroke lesion segmentation dataset.** *Scientific Data*. 2022;9:762. DOI: 10.1038/s41597-022-01875-5. Dataset DOI: 10.5281/zenodo.7153326.
+- Riedel EO et al. **The Ischemic Stroke Lesion Segmentation Challenge (ISLES)'24 Dataset: A Multimodal Stroke Imaging Dataset with Hyperacute CT, Acute Postinterventional MRI, and 3-month Clinical Outcomes.** *Radiology: Artificial Intelligence*. Dataset DOI: 10.5281/zenodo.16813698.
+- de la Rosa E et al. **ISLES'24: Improving final infarct prediction in ischemic stroke using multimodal imaging and clinical data.** arXiv:2408.10966.
 
-These are different datasets and must not be conflated.
+These are different datasets and, for ISLES'24, a different longitudinal prediction task. They must not be conflated.
 
 ## Epidemiology and clinical background
 
@@ -44,13 +46,15 @@ Add strong, reproducible contemporary baselines before claiming novelty over dee
 
 nnU-Net v2 should be the primary implementation baseline. MedNeXt is a secondary architecture comparison only after compute and validation are matched.
 
-## Stroke-specific modern reference
+## Stroke-specific modern references
 
-Add the current ISLES benchmark follow-up:
+Add current benchmark and translation references:
 
 - de la Rosa E et al. **DeepISLES: a clinically validated ischemic stroke segmentation model from the ISLES'22 challenge.** *Nature Communications*. 2025;16:7357. DOI: 10.1038/s41467-025-62373-x.
+- Ren T et al. **How We Won the ISLES'24 Challenge by Preprocessing.** arXiv:2505.18424. Use this as a challenge-method reference when discussing the importance of CT preprocessing, not as the sole definition of state of the art.
+- Current 2026 reviews of acute ischemic stroke segmentation should be used to distinguish same-modality lesion segmentation from cross-modality or longitudinal tissue-outcome prediction.
 
-This paper is particularly important because it evaluates generalizability beyond the original challenge and is more appropriate for a 2026 discussion of clinical robustness than isolated accuracy claims from small single-center studies.
+DeepISLES remains important for MRI generalizability, while ISLES'24 references are the correct context for the new primary modernization task.
 
 ## References to demote or remove
 
@@ -64,6 +68,7 @@ This paper is particularly important because it evaluates generalizability beyon
 The revised manuscript should maintain two explicit layers:
 
 1. **Reproduction layer:** cite the sources and benchmark papers that were available to the original method and preserve the historical ISLES 2015 context.
-2. **Modernization layer:** cite current epidemiology, ISLES 2022, nnU-Net/nnU-Net Revisited, MedNeXt where tested, and DeepISLES.
+2. **Bridge layer:** cite real ISLES 2022 and DeepISLES when discussing modern MRI segmentation.
+3. **Primary modernization layer:** cite ISLES'24 dataset/challenge papers, current CT final-infarct prediction work, nnU-Net/nnU-Net Revisited, and any compute-matched architecture actually tested.
 
 Never replace an old source in a way that makes the historical experiment appear to have used a dataset, method, metric or clinical claim that did not exist at the time.
