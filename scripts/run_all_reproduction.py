@@ -186,6 +186,23 @@ def main() -> int:
                 "--resume",
             ],
         ),
+        (
+            "voxel_leakage_papersize",
+            args.output_root / "voxel_leakage_papersize" / "voxel_leakage_summary.csv",
+            [
+                py,
+                str(here / "run_voxel_leakage_diagnostic.py"),
+                "--data-root",
+                str(args.data_root),
+                "--output-root",
+                str(args.output_root / "voxel_leakage_papersize"),
+                "--seed",
+                str(args.seed),
+                "--target-per-class",
+                "15000",
+                "--resume",
+            ],
+        ),
     ]
 
     for index, (stage, final_artifact, command) in enumerate(stages, start=1):
