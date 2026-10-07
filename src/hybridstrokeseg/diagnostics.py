@@ -62,7 +62,7 @@ def histogram_match_values(source: np.ndarray, reference: np.ndarray) -> np.ndar
     if not np.isfinite(src).all() or not np.isfinite(ref).all():
         raise ValueError("source and reference must contain only finite values")
 
-    src_values, src_inverse, src_counts = np.unique(
+    _src_values, src_inverse, src_counts = np.unique(
         src, return_inverse=True, return_counts=True
     )
     ref_values, ref_counts = np.unique(ref, return_counts=True)
