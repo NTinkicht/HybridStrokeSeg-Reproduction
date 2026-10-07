@@ -9,6 +9,12 @@ from .isles2022 import (
     geometry_signature,
     summarize_geometry,
 )
+from .isles2024 import (
+    ISLES24Case,
+    case_geometry_report_isles2024,
+    discover_isles2024_cases,
+    summarize_isles2024,
+)
 
 __all__ = [
     "ISLES22Case",
@@ -25,10 +31,3 @@ __all__ = [
     "summarize_geometry",
     "summarize_isles2024",
 ]
-
-from .isles2024 import (
-    ISLES24Case,
-    case_geometry_report_isles2024,
-    discover_isles2024_cases,
-    summarize_isles2024,
-)
