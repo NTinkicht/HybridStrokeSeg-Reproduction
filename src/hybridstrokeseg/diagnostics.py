@@ -46,3 +46,31 @@ def random_pixel_partition(
     validation = np.sort(indices[n_train : n_train + n_validation])
     test = np.sort(indices[n_train + n_validation :])
     return PixelPartition(train=train, validation=validation, test=test)
+
+
+def histogram_match_values(source: np.ndarray, reference: np.ndarray) -> np.ndarray:
+    """Match one 1-D intensity distribution to another by empirical CDF.
+
+    This is a deterministic clean-room implementation of classical histogram
+    specification. It is used only for sensitivity analysis because the
+    manuscript does not report the reference image or implementation details.
+    """
+    src = np.asarray(source, dtype=np.float64).reshape(-1)
+    ref = np.asarray(reference, dtype=np.float64).reshape(-1)
+    if src.size == 0 or ref.size == 0:
+        raise ValueError("source and reference must be non-empty")
+    if not np.isfinite(src).all() or not np.isfinite(ref).all():
+        raise ValueError("source and reference must contain only finite values")
+
+    src_values, src_inverse, src_counts = np.unique(
+        src, return_inverse=True, return_counts=True
+    )
+    ref_values, ref_counts = np.unique(ref, return_counts=True)
+
+    src_quantiles = np.cumsum(src_counts, dtype=np.float64)
+    src_quantiles /= src_quantiles[-1]
+    ref_quantiles = np.cumsum(ref_counts, dtype=np.float64)
+    ref_quantiles /= ref_quantiles[-1]
+
+    mapped_values = np.interp(src_quantiles, ref_quantiles, ref_values)
+    return mapped_values[src_inverse].astype(np.float32, copy=False)
