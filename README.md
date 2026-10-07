@@ -49,6 +49,11 @@ This notebook prepares a geometry-gated DWI+ADC nnU-Net v2 experiment, runs data
 
 ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **longitudinal final-infarct prediction** from pre-interventional acute data. The public training release contains 149 labeled cases and is approximately 99 GB.
 
+
+[![Open ISLES'24 persistent downloader in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/04_download_isles2024_to_drive.ipynb)
+
+The downloader writes the 99 GB archive directly to Google Drive, resumes partial transfers after Colab disconnects, and verifies the current Zenodo v7 checksum before declaring the archive complete.
+
 The repository deliberately does not auto-download this archive. After obtaining and extracting it, audit the release with:
 
 ```bash
