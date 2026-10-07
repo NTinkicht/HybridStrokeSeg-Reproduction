@@ -131,23 +131,38 @@ This is **not** a clinically valid evaluation protocol and must never be reporte
 
 This is the largest upward shift observed so far. Within-patient pixel leakage plus no scaling raises the quick SVM result into the **0.44 Dice** range and AUC to about **0.93**. That makes leakage a credible contributor to the manuscript's reported score, but it still does not fully explain the reported **0.56 ± 0.26** Dice at the 2,000-per-class diagnostic sample size.
 
-## Next confirmation: paper-size voxel leakage
+## Completed confirmation: paper-size voxel leakage
 
-The manuscript also reports balancing approximately 15,000 lesion and 15,000 non-lesion pixels. The leakage diagnostic above used 2,000 per class for speed. Because leakage produced by far the largest increase of any tested uncertainty, the autonomous pipeline now includes a confirmation run using **15,000 pixels per class** while keeping the same four pixel-split/scaling conditions.
+The leakage diagnostic was repeated with the manuscript-scale **15,000 lesion + 15,000 non-lesion training pixels** per condition.
 
-This is still a leakage diagnostic only. Its purpose is to test whether the combination of:
+| Configuration | Dice mean ± SD | Precision | Recall | AUC |
+| --- | ---: | ---: | ---: | ---: |
+| pixel 70/30, no scaling | **0.441 ± 0.272** | 0.404 | 0.800 | 0.925 |
+| pixel 70/15/15, no scaling | **0.438 ± 0.269** | 0.404 | 0.804 | 0.927 |
+| pixel 70/30, standard scaling | 0.425 ± 0.296 | 0.396 | 0.701 | 0.922 |
+| pixel 70/15/15, standard scaling | 0.422 ± 0.291 | 0.389 | 0.714 | **0.934** |
 
-- same-patient pixels on both sides of the split;
-- paper-scale class balancing;
-- no feature standardization;
+Increasing the balanced sample from 2,000 to 15,000 pixels per class **does not move the no-scaling leakage Dice toward 0.56**. The strongest mean Dice remains about 0.44. Interestingly, the larger sample substantially improves the standard-scaled leakage conditions from about 0.30 to about 0.42, but the best result is still materially below the manuscript's **0.56 ± 0.26**.
 
-can account for more of the published SVM result.
+The combined evidence therefore supports a narrower conclusion: within-patient pixel leakage is a credible contributor to inflation, but it is **not sufficient by itself** to reproduce the published score.
+
+## Next diagnostic: true histogram specification
+
+The manuscript explicitly mentions histogram specification but gives neither the reference image nor the algorithm. The autonomous pipeline now includes a patient-level 19/9, 15,000-per-class diagnostic comparing:
+
+- no histogram matching;
+- empirical-CDF histogram matching to the first training reference slice;
+- empirical-CDF histogram matching to a deterministic median-intensity training reference slice;
+
+under both standard scaling and no SVM scaling.
+
+Reference images are selected from training patients only. This is an uncertainty analysis, not recovery of the original unknown preprocessing.
 
 The stage writes:
 
 ```text
-outputs/voxel_leakage_papersize/voxel_leakage_summary.csv
-outputs/voxel_leakage_papersize/voxel_leakage_metadata.json
+outputs/histogram_specification/histogram_specification_summary.csv
+outputs/histogram_specification/histogram_specification_metadata.json
 ```
 
-If this confirmation still remains materially below 0.56, the next priorities are true histogram specification, exact neighborhood/weighted-local-mean reconstruction, and an exact scaled-conjugate-gradient MLP with the paper's two-output encoding.
+If histogram specification still does not close the gap, the remaining high-priority fidelity work is the exact neighborhood/weighted-local-mean reconstruction and an exact scaled-conjugate-gradient MLP with the paper's reported two-output encoding.
