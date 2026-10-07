@@ -203,6 +203,25 @@ def main() -> int:
                 "--resume",
             ],
         ),
+        (
+            "histogram_specification",
+            args.output_root
+            / "histogram_specification"
+            / "histogram_specification_summary.csv",
+            [
+                py,
+                str(here / "run_histogram_specification_diagnostic.py"),
+                "--data-root",
+                str(args.data_root),
+                "--output-root",
+                str(args.output_root / "histogram_specification"),
+                "--seed",
+                str(args.seed),
+                "--target-per-class",
+                "15000",
+                "--resume",
+            ],
+        ),
     ]
 
     for index, (stage, final_artifact, command) in enumerate(stages, start=1):

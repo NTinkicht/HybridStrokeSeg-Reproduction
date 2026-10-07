@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from hybridstrokeseg.diagnostics import random_pixel_partition
+from hybridstrokeseg.diagnostics import histogram_match_values, random_pixel_partition
 
 
 def test_random_pixel_partition_is_deterministic_disjoint_and_exhaustive():
@@ -59,3 +59,18 @@ def test_random_pixel_partition_rejects_invalid_fractions(train_fraction, valida
             validation_fraction=validation_fraction,
             seed=1,
         )
+
+
+def test_histogram_match_values_maps_empirical_quantiles():
+    source = np.array([0, 0, 1, 1], dtype=float)
+    reference = np.array([10, 10, 20, 20], dtype=float)
+    matched = histogram_match_values(source, reference)
+    assert matched.dtype == np.float32
+    assert np.array_equal(matched, np.array([10, 10, 20, 20], dtype=np.float32))
+
+
+def test_histogram_match_values_rejects_empty_or_nonfinite_inputs():
+    with pytest.raises(ValueError):
+        histogram_match_values(np.array([]), np.array([1.0]))
+    with pytest.raises(ValueError):
+        histogram_match_values(np.array([1.0]), np.array([np.nan]))
