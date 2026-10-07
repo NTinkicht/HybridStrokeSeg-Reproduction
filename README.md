@@ -4,10 +4,11 @@ Reproduction and modernization of **Deep Hybrid Learning for Ischemic Stroke Les
 
 ## Scope
 
-This repository has two deliberately separated tracks:
+This repository has three deliberately separated tracks:
 
-1. **Historical reproduction**: reconstruct the paper's handcrafted 9-feature pixel-classification pipeline with an MLP and RBF-SVM.
-2. **Modernization**: evaluate contemporary 3D stroke-lesion segmentation baselines and updated datasets without mixing their results with the historical reproduction.
+1. **Historical reproduction - ISLES 2015**: reconstruct the paper's handcrafted 9-feature pixel-classification pipeline with an MLP and RBF-SVM.
+2. **Bridge validation - real ISLES 2022**: retain a modern MRI benchmark that verifies the dataset correction and supports optional 3-D DWI/ADC/FLAIR experiments.
+3. **Primary modernization - ISLES'24**: predict final post-treatment infarct from pre-interventional acute CT/CTA/CTP-derived imaging and baseline clinical data.
 
 ## Important dataset correction
 
@@ -16,8 +17,9 @@ The manuscript repeatedly refers to "ISLES 2022", but the reported dataset chara
 Accordingly:
 
 - the reproduction track targets **ISLES 2015 SISS**;
-- the modernization track targets the real **ISLES 2022** public training release;
-- historical and modern results are never mixed into one benchmark table as if they were directly comparable;
+- real **ISLES 2022** is retained as an optional bridge MRI benchmark, not as the dataset used by the manuscript;
+- **ISLES'24 is the primary forward-looking modernization benchmark**;
+- historical, 2022, and 2024 results are never mixed as if they were the same task;
 - reconstruction assumptions for underspecified manuscript details are explicitly documented and configurable.
 
 ## Run in Google Colab
@@ -42,6 +44,21 @@ This notebook downloads the public 250-case ISLES 2022 training release, verifie
 
 This notebook prepares a geometry-gated DWI+ADC nnU-Net v2 experiment, runs dataset integrity verification and preprocessing, installs the repository's deterministic patient-level 5-fold split, and provides fold-training/model-selection commands. Full five-fold training is intentionally not auto-started because it is an expensive GPU experiment.
 
+
+### Primary modernization target: ISLES'24
+
+ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **longitudinal final-infarct prediction** from pre-interventional acute data. The public training release contains 149 labeled cases and is approximately 99 GB.
+
+The repository deliberately does not auto-download this archive. After obtaining and extracting it, audit the release with:
+
+```bash
+python scripts/audit_isles2024.py \
+  /path/to/ISLES24 \
+  --json outputs/isles2024_audit.json
+```
+
+The audit keeps valid acute model inputs separate from follow-up DWI/ADC and outcome information. Follow-up MRI and post-treatment/outcome variables are never permitted as prediction inputs.
+
 ## Historical reproduction implementation
 
 The repository contains:
@@ -62,9 +79,12 @@ See `docs/reconstruction_assumptions.md` before interpreting any numerical resul
 
 ## Modernization implementation
 
+The primary modernization target is now ISLES'24. ISLES 2022 remains available as a bridge benchmark.
+
 The modernization track now contains:
 
-- verified downloader for the public ISLES 2022 release from Zenodo;
+- verified downloader and audit support for the public ISLES 2022 bridge release;
+- ISLES'24 case discovery and NCCT-grid audit support with an explicit anti-leakage boundary between acute inputs and follow-up target-generation data;
 - BIDS-style DWI/ADC/FLAIR/mask case discovery;
 - voxel-grid geometry auditing for every modality against DWI;
 - deterministic patient-level 5-fold cross-validation;
@@ -74,7 +94,7 @@ The modernization track now contains:
 - MedNeXt reserved for a later compute-matched secondary comparison;
 - a 2026 reference-refresh map including ISLES 2015, ISLES 2022, nnU-Net, nnU-Net Revisited, MedNeXt, DeepISLES, WHO 2025 and the World Stroke Organization 2025 fact sheet.
 
-Read `docs/modernization_protocol.md` and `docs/reference_refresh.md` before interpreting the modern experiments.
+Read `docs/research_strategy.md`, `docs/isles2024_protocol.md`, `docs/modernization_protocol.md`, and `docs/reference_refresh.md` before interpreting the modern experiments.
 
 ## Historical reproduction commands
 
@@ -160,4 +180,4 @@ Patient data, medical images, model checkpoints and local experiment outputs are
 
 ## Next milestone
 
-Execute the real ISLES 2022 audit and DWI+ADC nnU-Net baseline. FLAIR will be added only after its geometry is checked and, if needed, a deterministic registration pipeline is validated. The historical reproduction remains frozen as a separate track.
+Audit the real ISLES'24 public training release, then stage a leakage-safe **NCCT-only nnU-Net v2 baseline** on deterministic patient-level folds. After that, add registered perfusion maps, CTA, and finally baseline clinical fusion as controlled ablations. ISLES 2022 remains an optional bridge experiment; the historical ISLES 2015 reproduction is frozen as a separate evidence track.
