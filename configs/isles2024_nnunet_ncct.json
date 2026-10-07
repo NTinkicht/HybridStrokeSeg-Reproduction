@@ -1,0 +1,36 @@
+{
+  "strategy": "ISLES'24 primary modernization baseline",
+  "dataset_id": 504,
+  "dataset_name": "ISLES2024_NCCT",
+  "task": "predict final post-treatment infarct from pre-interventional acute imaging",
+  "channels": [
+    "ncct"
+  ],
+  "forbidden_inputs": [
+    "follow-up DWI",
+    "follow-up ADC",
+    "final infarct mask",
+    "post-treatment variables",
+    "3-month outcomes"
+  ],
+  "model": "nnU-Net v2.8.1",
+  "configuration": "3d_fullres",
+  "folds": 5,
+  "split_seed": 2026,
+  "primary_metrics": [
+    "Dice",
+    "absolute volume difference",
+    "absolute lesion-count difference",
+    "lesion-wise F1"
+  ],
+  "next_ablations": [
+    "NCCT + Tmax + CBF + CBV + MTT",
+    "NCCT + CTA + Tmax + CBF + CBV + MTT",
+    "imaging + baseline clinical fusion"
+  ],
+  "notes": [
+    "Audit all 149 public cases before staging.",
+    "Use only NCCT-space derivatives that pass the geometry gate.",
+    "Copy the generated splits_final.json into nnUNet_preprocessed after planning."
+  ]
+}
