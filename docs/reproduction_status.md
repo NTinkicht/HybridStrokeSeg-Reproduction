@@ -12,7 +12,7 @@ The run used 15,000 lesion and 15,000 non-lesion training pixels, the reconstruc
 
 | Model | Manuscript Dice | Current reproduction Dice | Difference | Precision | Recall | AUC |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| MLP | 0.59 ± 0.27 | 0.237 ± 0.254 | -0.353 | 0.186 | 0.542 | 0.804 |
+| MLP | 0.59 ± 0.27 | 0.252 ± 0.260 | -0.338 | 0.197 | 0.585 | 0.830 |
 | RBF-SVM | 0.56 ± 0.26 | 0.269 ± 0.289 | -0.291 | 0.206 | 0.518 | 0.827 |
 
 These values are **not a successful numerical reproduction** of the manuscript. They are evidence that one or more unavailable implementation details materially affect performance.
@@ -100,23 +100,54 @@ outputs/svm_sensitivity/svm_sensitivity.csv
 outputs/svm_sensitivity/svm_sensitivity_metadata.json
 ```
 
-## Next diagnostic: morphology scale
+## Completed diagnostic: morphology scale
 
-The manuscript explicitly says that dilation is followed by erosion, which is a morphological closing operation, but it does not report the structuring-element shape or size. The current reconstruction uses a 2-D disk with radius 1.
+The manuscript specifies dilation followed by erosion but does not report the structuring-element size. A 10-condition screen tested disk radii 0, 1, 2, 3 and 5 under both standard scaling and no SVM scaling.
 
-A predeclared morphology screen is now available. It evaluates disk radii `0, 1, 2, 3, 5`, where radius 0 is the no-postprocessing control. Because the completed SVM diagnostic showed a meaningful interaction with feature scaling, the morphology screen is repeated for two SVM scaling modes: `standard` and `none`. `C=1` and `gamma=scale` remain fixed.
+| Configuration | Dice mean ± SD | AUC |
+| --- | ---: | ---: |
+| no scaling, radius 3 | **0.324 ± 0.395** | 0.857 |
+| no scaling, radius 5 | 0.324 ± 0.395 | 0.857 |
+| no scaling, radius 2 | 0.323 ± 0.392 | 0.857 |
+| no scaling, radius 1 | 0.322 ± 0.391 | 0.857 |
+| no scaling, radius 0 | 0.322 ± 0.391 | 0.857 |
+| standard scaling, radius 0 | 0.228 ± 0.302 | 0.798 |
+| standard scaling, radius 5 | 0.218 ± 0.301 | 0.798 |
 
-Run:
+The no-postprocessing control and the strongest radius differ by only about **0.002 Dice**, so morphology scale is not a plausible explanation for the manuscript's reported 0.56 SVM Dice. Under standard scaling, larger closing radii actually reduce Dice.
 
-```bash
-python scripts/run_morphology_sensitivity.py
-```
+## Completed diagnostic: voxel-level leakage implied by contradictory split wording
 
-It writes:
+The manuscript contains conflicting 70/30 and 70/15/15 random-split language. To test whether this could correspond to pixel-level rather than patient-level splitting, a deliberately invalid leakage diagnostic placed pixels from the same 28 patients on both sides of the split.
+
+This is **not** a clinically valid evaluation protocol and must never be reported as generalization performance.
+
+| Configuration | Dice mean ± SD | Precision | Recall | AUC |
+| --- | ---: | ---: | ---: | ---: |
+| pixel 70/15/15, no scaling | **0.443 ± 0.304** | 0.478 | 0.679 | 0.929 |
+| pixel 70/30, no scaling | **0.442 ± 0.308** | 0.477 | 0.668 | 0.927 |
+| pixel 70/30, standard scaling | 0.302 ± 0.320 | 0.263 | 0.480 | 0.886 |
+| pixel 70/15/15, standard scaling | 0.297 ± 0.319 | 0.256 | 0.479 | 0.897 |
+
+This is the largest upward shift observed so far. Within-patient pixel leakage plus no scaling raises the quick SVM result into the **0.44 Dice** range and AUC to about **0.93**. That makes leakage a credible contributor to the manuscript's reported score, but it still does not fully explain the reported **0.56 ± 0.26** Dice at the 2,000-per-class diagnostic sample size.
+
+## Next confirmation: paper-size voxel leakage
+
+The manuscript also reports balancing approximately 15,000 lesion and 15,000 non-lesion pixels. The leakage diagnostic above used 2,000 per class for speed. Because leakage produced by far the largest increase of any tested uncertainty, the autonomous pipeline now includes a confirmation run using **15,000 pixels per class** while keeping the same four pixel-split/scaling conditions.
+
+This is still a leakage diagnostic only. Its purpose is to test whether the combination of:
+
+- same-patient pixels on both sides of the split;
+- paper-scale class balancing;
+- no feature standardization;
+
+can account for more of the published SVM result.
+
+The stage writes:
 
 ```text
-outputs/morphology_sensitivity/morphology_sensitivity.csv
-outputs/morphology_sensitivity/morphology_sensitivity_metadata.json
+outputs/voxel_leakage_papersize/voxel_leakage_summary.csv
+outputs/voxel_leakage_papersize/voxel_leakage_metadata.json
 ```
 
-This is again an uncertainty diagnostic, not score matching. After morphology, the remaining priorities are true histogram specification, a deliberately labeled leakage diagnostic for the contradictory 70/15/15 voxel-split wording, exact neighborhood/weighted-mean reconstruction, and an exact scaled-conjugate-gradient MLP implementation.
+If this confirmation still remains materially below 0.56, the next priorities are true histogram specification, exact neighborhood/weighted-local-mean reconstruction, and an exact scaled-conjugate-gradient MLP with the paper's two-output encoding.
