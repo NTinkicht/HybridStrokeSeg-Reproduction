@@ -143,6 +143,13 @@ Git must continue to ignore:
 The repository now supports:
 - ISLES'24 BIDS-style case discovery;
 - a strict separation between valid acute inputs and follow-up target-generation data;
-- an NCCT-grid audit command.
+- an NCCT-grid audit command;
+- leakage-safe nnU-Net v2 staging for acute channels;
+- a deterministic five-fold patient split;
+- a predeclared NCCT-only baseline configuration.
 
-The next implementation milestone is nnU-Net staging for the NCCT-only baseline, followed by deterministic cross-validation manifests and official-style evaluation.
+After audit, stage the first baseline with:
+
+    python scripts/stage_isles2024_nnunet.py /path/to/ISLES24 "$nnUNet_raw" --channels ncct
+
+The next implementation milestone is official-style ISLES'24 evaluation plus a reproducible Colab/HPC training workflow for the NCCT-only baseline.
