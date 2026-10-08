@@ -1,11 +1,14 @@
 import importlib.util
+import sys
 from pathlib import Path
 
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "download_isles2024_parallel.py"
-SPEC = importlib.util.spec_from_file_location("download_isles2024_parallel", SCRIPT)
+MODULE_NAME = "download_isles2024_parallel"
+SPEC = importlib.util.spec_from_file_location(MODULE_NAME, SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
 MODULE = importlib.util.module_from_spec(SPEC)
+sys.modules[MODULE_NAME] = MODULE
 SPEC.loader.exec_module(MODULE)
 plan_ranges = MODULE.plan_ranges
 
