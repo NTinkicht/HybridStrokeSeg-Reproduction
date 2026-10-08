@@ -8,9 +8,10 @@ This downloader is designed for mounted Google Drive in Colab:
 - assembles the final archive only after every chunk is present;
 - verifies the official Zenodo MD5 before deleting temporary chunks.
 
-A small worker count is intentional. Zenodo may throttle aggressive parallel
-clients, while Google Drive FUSE performs better with sequential writes to
-independent files than with many random writes to one huge sparse file.
+Each worker writes to an independent persistent chunk file, so concurrency does
+not require random writes to one huge sparse archive. The Colab workflow uses
+16 workers by request; retries and resumable chunk state handle transient
+throttling or disconnects.
 """
 
 from __future__ import annotations
@@ -142,12 +143,31 @@ def download_range(
     parts_dir.mkdir(parents=True, exist_ok=True)
     final_path = _range_path(parts_dir, item)
 
-    if final_path.exists() and final_path.stat().st_size == item.size:
-        return item.index, "existing"
-    if final_path.exists():
-        final_path.unlink()
-
     partial = _partial_path(final_path)
+
+    if final_path.exists():
+        final_size = final_path.stat().st_size
+        if final_size == item.size:
+            return item.index, "existing"
+
+        # Google Drive FUSE can occasionally persist a file rename before every
+        # byte has reached Drive. Treat an undersized ".bin" as resumable data
+        # instead of deleting and redownloading the whole range.
+        if 0 < final_size < item.size:
+            partial_size = partial.stat().st_size if partial.exists() else -1
+            if final_size > partial_size:
+                if partial.exists():
+                    partial.unlink()
+                final_path.replace(partial)
+                print(
+                    f"Part {item.index}: salvaged {final_size / (1024**2):.1f} MiB "
+                    "from an undersized completed chunk.",
+                    flush=True,
+                )
+            else:
+                final_path.unlink()
+        else:
+            final_path.unlink()
     attempt = 0
     while True:
         existing = partial.stat().st_size if partial.exists() else 0
@@ -327,7 +347,7 @@ def main() -> int:
         default=None,
         help="Persistent chunk directory. Default: <archive>.parts",
     )
-    parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--workers", type=int, default=16)
     parser.add_argument(
         "--part-size-gib",
         type=float,
@@ -347,8 +367,8 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    if not 1 <= args.workers <= 8:
-        parser.error("--workers must be between 1 and 8")
+    if not 1 <= args.workers <= 32:
+        parser.error("--workers must be between 1 and 32")
     if args.part_size_gib <= 0:
         parser.error("--part-size-gib must be positive")
 
@@ -415,20 +435,17 @@ def main() -> int:
             for item in ranges
         }
         done = 0
+        persistent = completed_bytes
         for future in concurrent.futures.as_completed(futures):
             item = futures[future]
             try:
                 _, status = future.result()
                 done += 1
-                persistent = prefix_size + sum(
-                    candidate.size
-                    for candidate in ranges
-                    if _range_path(parts_dir, candidate).exists()
-                    and _range_path(parts_dir, candidate).stat().st_size == candidate.size
-                )
+                if status != "existing":
+                    persistent += item.size
                 print(
                     f"[{done}/{len(ranges)}] part {item.index:04d} {status}; "
-                    f"persistent {persistent / (1024**3):.1f} / "
+                    f"persistent complete ranges {persistent / (1024**3):.1f} / "
                     f"{total_size / (1024**3):.1f} GiB",
                     flush=True,
                 )
