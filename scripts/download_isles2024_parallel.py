@@ -19,7 +19,6 @@ import argparse
 import concurrent.futures
 import hashlib
 import json
-import os
 import re
 import shutil
 import time
