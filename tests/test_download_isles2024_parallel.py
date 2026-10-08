@@ -1,4 +1,13 @@
-from scripts.download_isles2024_parallel import plan_ranges
+import importlib.util
+from pathlib import Path
+
+
+SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "download_isles2024_parallel.py"
+SPEC = importlib.util.spec_from_file_location("download_isles2024_parallel", SCRIPT)
+assert SPEC is not None and SPEC.loader is not None
+MODULE = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(MODULE)
+plan_ranges = MODULE.plan_ranges
 
 
 def test_plan_ranges_covers_exact_interval_without_overlap():
