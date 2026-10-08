@@ -435,20 +435,17 @@ def main() -> int:
             for item in ranges
         }
         done = 0
+        persistent = completed_bytes
         for future in concurrent.futures.as_completed(futures):
             item = futures[future]
             try:
                 _, status = future.result()
                 done += 1
-                persistent = prefix_size + sum(
-                    candidate.size
-                    for candidate in ranges
-                    if _range_path(parts_dir, candidate).exists()
-                    and _range_path(parts_dir, candidate).stat().st_size == candidate.size
-                )
+                if status != "existing":
+                    persistent += item.size
                 print(
                     f"[{done}/{len(ranges)}] part {item.index:04d} {status}; "
-                    f"persistent {persistent / (1024**3):.1f} / "
+                    f"persistent complete ranges {persistent / (1024**3):.1f} / "
                     f"{total_size / (1024**3):.1f} GiB",
                     flush=True,
                 )
