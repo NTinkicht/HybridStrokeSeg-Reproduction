@@ -50,9 +50,11 @@ This notebook prepares a geometry-gated DWI+ADC nnU-Net v2 experiment, runs data
 ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **longitudinal final-infarct prediction** from pre-interventional acute data. The public training release contains 149 labeled cases and is approximately 99 GB.
 
 
-[![Open ISLES'24 persistent downloader in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/04_download_isles2024_to_drive.ipynb)
+[![Open ISLES'24 parallel downloader in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/05_download_isles2024_parallel_to_drive.ipynb)
 
-The downloader writes the 99 GB archive directly to Google Drive, resumes partial transfers after Colab disconnects, and verifies the current Zenodo v7 checksum before declaring the archive complete.
+The recommended downloader stores independent 1 GiB byte-range chunks in Google Drive and fetches **four chunks in parallel**. Completed chunks survive Colab disconnects, partial chunks resume, and any partial archive produced by the older sequential downloader is preserved as the already-downloaded prefix. After every range is present, the notebook assembles `train.7z`, verifies the current Zenodo v7 MD5, then removes the temporary chunks.
+
+The older single-stream notebook remains in the repository as a fallback, but the parallel chunked notebook is preferred for unstable Colab sessions.
 
 The repository deliberately does not auto-download this archive. After obtaining and extracting it, audit the release with:
 
