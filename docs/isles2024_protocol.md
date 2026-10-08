@@ -28,18 +28,27 @@ Official challenge:
 https://isles-24.grand-challenge.org/
 
 
-## Persistent download
+## Persistent parallel download
 
 Because the current training archive is about 99 GB, store it on persistent storage rather than the ephemeral Colab filesystem.
 
-For a mounted Google Drive:
+For unstable Colab sessions, the preferred workflow is the parallel chunked downloader:
 
 ```bash
-python scripts/download_isles2024.py \
-  --archive "/content/drive/MyDrive/HybridStrokeSeg/ISLES2024/raw/train.7z"
+python scripts/download_isles2024_parallel.py \
+  --archive "/content/drive/MyDrive/HybridStrokeSeg/ISLES2024/raw/train.7z" \
+  --parts-dir "/content/drive/MyDrive/HybridStrokeSeg/ISLES2024/raw/train.7z.parts" \
+  --workers 4 \
+  --part-size-gib 1
 ```
 
-The downloader resumes partial HTTP transfers and verifies the current Zenodo v7 MD5 before declaring the archive ready. If Colab disconnects, rerun the same command; the partial file is retained.
+The downloader first verifies that the Zenodo endpoint supports HTTP Range requests. It then stores independent 1 GiB byte ranges as persistent files and fetches four ranges concurrently. Completed chunks are skipped on rerun and partially downloaded chunks resume from their saved byte count.
+
+If the older sequential downloader already created a partial `train.7z`, the parallel downloader renames that contiguous partial file to `train.7z.prefix` and keeps it as already-downloaded data. It downloads only the remaining ranges.
+
+After all ranges are present, the script sequentially assembles the final archive, verifies the current Zenodo v7 MD5, and only then removes the temporary prefix/chunk files.
+
+The single-stream `scripts/download_isles2024.py` downloader remains available as a fallback.
 
 ## Critical task distinction
 
