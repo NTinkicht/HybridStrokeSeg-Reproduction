@@ -8,9 +8,9 @@ context and must never be exposed to the prediction model.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 from .isles2022 import geometry_equal, geometry_signature
 
