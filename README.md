@@ -54,6 +54,10 @@ ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **lo
 
 [![Prepare ISLES'24 core + NCCT baseline in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/08_prepare_isles2024_core_and_ncct_baseline.ipynb)
 
+[![Train ISLES'24 NCCT nnU-Net five-fold CV in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/11_isles2024_NCCT_NNUNET_CV.ipynb)
+
+The training notebook uses persistent Drive paths for `nnUNet_preprocessed` and `nnUNet_results`, installs the pinned `nnunetv2==2.8.1` baseline, plans/preprocesses `3d_fullres` once, restores the deterministic project folds, and trains folds 0–4 with checkpoint resume and `--npz` validation outputs.
+
 After the 99 GB archive is complete, this notebook selectively extracts the core modeling subset, audits all 149 cases, and stages the first persistent NCCT-only nnU-Net v2 dataset on deterministic five-fold patient splits.
 
 The recommended downloader stores independent 1 GiB byte-range chunks in Google Drive and fetches **four chunks in parallel**. Completed chunks survive Colab disconnects, partial chunks resume, and any partial archive produced by the older sequential downloader is preserved as the already-downloaded prefix. After every range is present, the notebook assembles `train.7z`, verifies the current Zenodo v7 MD5, then removes the temporary chunks.

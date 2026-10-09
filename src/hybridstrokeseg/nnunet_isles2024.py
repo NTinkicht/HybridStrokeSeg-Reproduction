@@ -12,7 +12,7 @@ import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
-from .data.isles2022 import geometry_signature
+from .data.isles2022 import geometry_equal, geometry_signature
 from .data.isles2024 import ISLES24Case, geometry_equal_isles2024
 from .splits import make_patient_kfolds
 
@@ -87,6 +87,48 @@ def audit_isles2024_nnunet_geometry(
         if mismatches:
             failures[case.case_id] = mismatches
     return failures
+
+
+def _materialize_label_on_reference(
+    source: Path,
+    reference: Path,
+    destination: Path,
+    *,
+    resume: bool = False,
+) -> None:
+    """Write a label with the NCCT header exactly, without resampling voxels.
+
+    The public ISLES'24 release contains one benign qform/sform rounding
+    discrepancy. nnU-Net's own integrity checker can be stricter than our
+    dataset-specific tolerance, so staged labels are header-canonicalized to
+    the corresponding NCCT grid. Voxel values and array indexing are unchanged.
+    """
+    if (
+        resume
+        and destination.exists()
+        and geometry_equal(
+            geometry_signature(reference),
+            geometry_signature(destination),
+            atol=0.0,
+        )
+    ):
+        return
+
+    try:
+        import SimpleITK as sitk
+    except ImportError as exc:  # pragma: no cover
+        raise RuntimeError("SimpleITK is required to stage ISLES'24 labels") from exc
+
+    image = sitk.ReadImage(str(source))
+    ref = sitk.ReadImage(str(reference))
+    if image.GetSize() != ref.GetSize():
+        raise ValueError(
+            f"Cannot copy NCCT geometry onto label with different size: "
+            f"{source} vs {reference}"
+        )
+    image.CopyInformation(ref)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    sitk.WriteImage(image, str(destination), useCompression=True)
 
 
 def _materialize(
@@ -180,10 +222,10 @@ def stage_isles2024_nnunet(
             destination = images_tr / f"{target_id}_{channel_index:04d}.nii.gz"
             _materialize(source, destination, mode, resume=resume)
 
-        _materialize(
+        _materialize_label_on_reference(
             case.lesion_mask_ncct,
+            case.ncct,
             labels_tr / f"{target_id}.nii.gz",
-            mode,
             resume=resume,
         )
 
@@ -209,7 +251,9 @@ def stage_isles2024_nnunet(
         "ISLES'24 leakage gate: only pre-interventional acute imaging channels are "
         "eligible inputs. Follow-up DWI/ADC, outcome variables, and the final infarct "
         "mask must never be staged as input channels. Copy splits_final.json into the "
-        "matching nnUNet_preprocessed dataset directory after planning/preprocessing.\n",
+        "matching nnUNet_preprocessed dataset directory after planning/preprocessing. "
+        "Staged labels copy the NCCT header exactly without voxel resampling so "
+        "benign qform/sform rounding cannot trip nnU-Net integrity checks.\n",
         encoding="utf-8",
     )
     return dataset_dir
