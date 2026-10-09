@@ -22,7 +22,7 @@ import re
 import shutil
 import subprocess
 import tempfile
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 EXPECTED_CASES = 149
@@ -68,6 +68,7 @@ REQUIRED_IMAGING_CATEGORIES = (
     "mtt",
     "lesion_mask",
 )
+SUBJECT_RE = re.compile(r"(sub-[^/]+)", re.I)
 
 
 def find_7z() -> str:
@@ -155,17 +156,20 @@ def main() -> int:
     parser.add_argument(
         "--overwrite",
         action="store_true",
-        help="Allow extraction into a non-empty output directory.",
+        help="Clear previous extraction state and rewrite selected files.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=10,
+        help="Subjects per resumable extraction batch. Default: 10.",
     )
     args = parser.parse_args()
 
     if not args.archive.is_file():
         raise FileNotFoundError(args.archive)
-    if args.output_dir.exists() and any(args.output_dir.iterdir()) and not args.overwrite:
-        raise FileExistsError(
-            f"Output directory is non-empty: {args.output_dir}. "
-            "Use --overwrite to resume/refresh extraction."
-        )
+    if args.batch_size < 1:
+        parser.error("--batch-size must be positive")
 
     executable = find_7z()
     print(f"Listing archive with {executable}: {args.archive}")
@@ -201,34 +205,79 @@ def main() -> int:
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    state_dir = args.output_dir / ".extract_state"
+    if args.overwrite and state_dir.exists():
+        shutil.rmtree(state_dir)
+    state_dir.mkdir(parents=True, exist_ok=True)
 
-    with tempfile.NamedTemporaryFile(
-        "w",
-        encoding="utf-8",
-        suffix=".txt",
-        delete=False,
-    ) as handle:
-        listfile = Path(handle.name)
-        for member in selected:
-            handle.write(member + "\n")
+    by_subject: dict[str, list[str]] = defaultdict(list)
+    for member in selected:
+        match = SUBJECT_RE.search(normalize_for_matching(member))
+        if match is None:
+            raise RuntimeError(f"Selected member has no subject identifier: {member}")
+        by_subject[match.group(1).lower()].append(member)
 
-    try:
-        print(f"Extracting {len(selected)} selected files to {args.output_dir} ...")
-        subprocess.run(
-            [
-                executable,
-                "x",
-                str(args.archive),
-                f"-o{args.output_dir}",
-                "-y",
-                "-scsUTF-8",
-                f"-i@{listfile}",
-            ],
-            check=True,
+    subject_ids = sorted(by_subject)
+    if len(subject_ids) != EXPECTED_CASES:
+        raise RuntimeError(
+            f"Expected {EXPECTED_CASES} unique subjects, found {len(subject_ids)}"
         )
-    finally:
-        listfile.unlink(missing_ok=True)
 
+    batches = [
+        subject_ids[index : index + args.batch_size]
+        for index in range(0, len(subject_ids), args.batch_size)
+    ]
+    for batch_index, batch_subjects in enumerate(batches):
+        marker = state_dir / f"batch_{batch_index:03d}.done"
+        if marker.exists() and not args.overwrite:
+            print(
+                f"[{batch_index + 1}/{len(batches)}] "
+                f"Skipping completed batch ({len(batch_subjects)} subjects)"
+            )
+            continue
+
+        batch_members = [
+            member
+            for subject_id in batch_subjects
+            for member in by_subject[subject_id]
+        ]
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            suffix=".txt",
+            delete=False,
+        ) as handle:
+            listfile = Path(handle.name)
+            for member in batch_members:
+                handle.write(member + "\n")
+
+        try:
+            print(
+                f"[{batch_index + 1}/{len(batches)}] Extracting "
+                f"{len(batch_members)} files for {len(batch_subjects)} subjects ..."
+            )
+            subprocess.run(
+                [
+                    executable,
+                    "x",
+                    str(args.archive),
+                    f"-o{args.output_dir}",
+                    "-aoa",
+                    "-scsUTF-8",
+                    f"-i@{listfile}",
+                ],
+                check=True,
+            )
+        finally:
+            listfile.unlink(missing_ok=True)
+
+        marker.write_text(
+            "\n".join(batch_subjects) + "\n",
+            encoding="utf-8",
+        )
+
+    manifest["batch_size_subjects"] = args.batch_size
+    manifest["batches"] = len(batches)
     manifest_path.write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
