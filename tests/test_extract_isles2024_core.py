@@ -1,4 +1,4 @@
-# ruff: noqa: I001, ISC004
+# ruff: noqa: I001
 import importlib.util
 import sys
 from pathlib import Path
