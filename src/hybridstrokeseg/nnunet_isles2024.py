@@ -77,6 +77,9 @@ def audit_isles2024_nnunet_geometry(
         mismatches: list[str] = []
         for channel in channel_list:
             path = getattr(case, _CHANNEL_PATHS[channel])
+            if path is None:
+                mismatches.append(f"{channel}:missing")
+                continue
             if not geometry_equal(reference, geometry_signature(path)):
                 mismatches.append(channel)
         if not geometry_equal(reference, geometry_signature(case.lesion_mask_ncct)):
@@ -156,6 +159,10 @@ def stage_isles2024_nnunet(
 
         for channel_index, channel in enumerate(channel_list):
             source = getattr(case, _CHANNEL_PATHS[channel])
+            if source is None:
+                raise ValueError(
+                    f"Case {case.case_id} is missing requested channel {channel}"
+                )
             destination = images_tr / f"{target_id}_{channel_index:04d}.nii.gz"
             _materialize(source, destination, mode)
 
