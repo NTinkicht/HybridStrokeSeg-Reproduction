@@ -176,3 +176,41 @@ After audit, stage the first baseline with:
     python scripts/stage_isles2024_nnunet.py /path/to/ISLES24 "$nnUNet_raw" --channels ncct
 
 The next implementation milestone is official-style ISLES'24 evaluation plus a reproducible Colab/HPC training workflow for the NCCT-only baseline.
+
+
+## Core selective extraction
+
+The completed 99 GB archive is intentionally not expanded in full for the
+first experiments. The repository now extracts a leakage-safe core subset:
+
+- acute NCCT;
+- CTA registered to NCCT;
+- registered Tmax, CBF, CBV and MTT maps;
+- final-infarct lesion masks from derivatives/ses-0002;
+- baseline demographic/clinical CSV files.
+
+Raw 4-D CTP, follow-up DWI/ADC and outcome CSV files are excluded from this
+first extraction profile. This reduces storage and makes the temporal
+anti-leakage boundary explicit.
+
+The extraction is resumable in subject batches:
+
+    python scripts/extract_isles2024_core.py train.7z /path/to/core --batch-size 10
+
+After extraction:
+
+    python scripts/audit_isles2024.py /path/to/core \
+      --channels ncct cta tmax cbf cbv mtt \
+      --json outputs/isles2024_core_audit.json
+
+Then stage the first predeclared baseline:
+
+    python scripts/stage_isles2024_nnunet.py \
+      /path/to/core "$nnUNet_raw" \
+      --dataset-id 504 \
+      --dataset-name ISLES2024_NCCT \
+      --channels ncct \
+      --resume
+
+The one-click persistent Colab workflow is
+`notebooks/08_prepare_isles2024_core_and_ncct_baseline.ipynb`.
