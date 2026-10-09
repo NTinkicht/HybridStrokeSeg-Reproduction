@@ -1,3 +1,4 @@
+# ruff: noqa: I001, ISC004
 import importlib.util
 import sys
 from pathlib import Path
@@ -37,13 +38,21 @@ def test_classify_official_core_members():
 
 def test_extractor_excludes_followup_mri_outcomes_and_raw_ctp():
     excluded = (
-        "train/rawdata/sub-strokecase0001/ses-0001/"
-        "sub-strokecase0001_ses-0001_ctp.nii.gz",
-        "train/rawdata/sub-strokecase0001/ses-0002/"
-        "sub-strokecase0001_ses-0002_dwi.nii.gz",
-        "train/rawdata/sub-strokecase0001/ses-0002/"
-        "sub-strokecase0001_ses-0002_adc.nii.gz",
-        "train/phenotype/ses-0002/"
-        "sub-strokecase0001_ses-0002_outcome.csv",
+        (
+            "train/rawdata/sub-strokecase0001/ses-0001/"
+            "sub-strokecase0001_ses-0001_ctp.nii.gz"
+        ),
+        (
+            "train/rawdata/sub-strokecase0001/ses-0002/"
+            "sub-strokecase0001_ses-0002_dwi.nii.gz"
+        ),
+        (
+            "train/rawdata/sub-strokecase0001/ses-0002/"
+            "sub-strokecase0001_ses-0002_adc.nii.gz"
+        ),
+        (
+            "train/phenotype/ses-0002/"
+            "sub-strokecase0001_ses-0002_outcome.csv"
+        ),
     )
     assert all(MODULE.classify_member(path) is None for path in excluded)
