@@ -28,7 +28,10 @@ def main() -> int:
     parser.add_argument("--split-seed", type=int, default=2026)
     args = parser.parse_args()
 
-    cases = discover_isles2024_cases(args.dataset_root)
+    cases = discover_isles2024_cases(
+        args.dataset_root,
+        required_channels=args.channels,
+    )
     print(f"Discovered {len(cases)} labeled ISLES'24 training cases.")
     print(
         "ANTI-LEAKAGE: follow-up DWI/ADC, final masks, post-treatment variables, "
