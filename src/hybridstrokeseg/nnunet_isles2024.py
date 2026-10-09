@@ -103,13 +103,16 @@ def _materialize_label_on_reference(
     dataset-specific tolerance, so staged labels are header-canonicalized to
     the corresponding NCCT grid. Voxel values and array indexing are unchanged.
     """
-    if resume and destination.exists():
-        if geometry_equal(
+    if (
+        resume
+        and destination.exists()
+        and geometry_equal(
             geometry_signature(reference),
             geometry_signature(destination),
             atol=0.0,
-        ):
-            return
+        )
+    ):
+        return
 
     try:
         import SimpleITK as sitk
