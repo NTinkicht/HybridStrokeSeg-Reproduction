@@ -214,3 +214,40 @@ Then stage the first predeclared baseline:
 
 The one-click persistent Colab workflow is
 `notebooks/08_prepare_isles2024_core_and_ncct_baseline.ipynb`.
+
+
+## NCCT-only nnU-Net v2 training workflow
+
+The first predeclared modern baseline is now staged as
+`Dataset504_ISLES2024_NCCT` with 149 patient-level training cases and a fixed
+five-fold split (seed 2026).
+
+Before nnU-Net preprocessing, staged lesion masks copy the corresponding NCCT
+header exactly **without resampling voxels**. This handles the one benign
+qform/sform rounding discrepancy observed in the public release while
+preserving the mask array unchanged.
+
+Persistent Colab workflow:
+
+`notebooks/11_isles2024_NCCT_NNUNET_CV.ipynb`
+
+The workflow pins `nnunetv2==2.8.1`, runs:
+
+    nnUNetv2_plan_and_preprocess -d 504 --verify_dataset_integrity -c 3d_fullres
+
+then restores the deterministic `splits_final.json` and trains folds 0--4
+with validation probabilities enabled:
+
+    nnUNetv2_train 504 3d_fullres FOLD --npz --c -device cuda
+
+The orchestrator skips folds with `checkpoint_final.pth` and resumes
+interrupted folds from nnU-Net checkpoints. Persistent outputs are written to:
+
+- `ISLES2024/nnUNet_preprocessed/`
+- `ISLES2024/nnUNet_results/`
+- `ISLES2024/results/nnunet_ncct_cv.log`
+- `ISLES2024/results/nnunet_ncct_cv_status.json`
+
+After all five folds complete, the next step is out-of-fold evaluation using
+the official ISLES'24 metric family: Dice, absolute volume difference,
+absolute lesion-count difference, and lesion-wise F1.
