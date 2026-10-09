@@ -287,43 +287,98 @@ def assemble(
     *,
     total_size: int,
 ) -> str:
+    """Assemble the final archive, resuming an interrupted Drive write.
+
+    The range list begins immediately after the contiguous prefix. Therefore the
+    original prefix length can be reconstructed from the planned ranges even if
+    the standalone prefix file has already disappeared but its bytes are safely
+    present at the start of an existing .assembling file.
+    """
     assembling = archive.with_suffix(archive.suffix + ".assembling")
-    if assembling.exists():
-        assembling.unlink()
+    prefix_size = total_size - sum(item.size for item in ranges)
+    existing_size = assembling.stat().st_size if assembling.exists() else 0
 
-    digest = hashlib.md5()
-    written = 0
+    if existing_size > total_size:
+        raise RuntimeError(
+            f"Existing assembly is larger than expected: {existing_size} > {total_size}"
+        )
 
-    with assembling.open("wb") as destination:
-        if prefix.exists():
+    if existing_size == 0:
+        if prefix_size and not prefix.exists():
+            raise RuntimeError(
+                "Cannot start assembly because the original prefix file is missing."
+            )
+        mode = "wb"
+    else:
+        mode = "ab"
+        print(
+            f"Resuming final assembly at {existing_size / (1024**3):.2f} / "
+            f"{total_size / (1024**3):.2f} GiB",
+            flush=True,
+        )
+
+    with assembling.open(mode) as destination:
+        cursor = existing_size
+
+        # Append the not-yet-written portion of the initial contiguous prefix.
+        if cursor < prefix_size:
+            if not prefix.exists():
+                raise RuntimeError(
+                    "Assembly stops inside the original prefix, but the prefix file "
+                    "is no longer available."
+                )
             with prefix.open("rb") as source:
-                while True:
-                    block = source.read(COPY_BUFFER)
+                source.seek(cursor)
+                remaining = prefix_size - cursor
+                while remaining > 0:
+                    block = source.read(min(COPY_BUFFER, remaining))
                     if not block:
-                        break
+                        raise RuntimeError("Unexpected EOF while appending prefix")
                     destination.write(block)
-                    digest.update(block)
-                    written += len(block)
+                    cursor += len(block)
+                    remaining -= len(block)
 
+        # Append only the missing tail of each persistent range chunk.
+        logical_start = prefix_size
         for item in ranges:
+            logical_end = logical_start + item.size
+            if cursor >= logical_end:
+                logical_start = logical_end
+                continue
+
             part_path = _range_path(parts_dir, item)
             if not part_path.exists() or part_path.stat().st_size != item.size:
                 raise RuntimeError(f"Missing or incomplete chunk: {part_path}")
-            with part_path.open("rb") as source:
-                while True:
-                    block = source.read(COPY_BUFFER)
-                    if not block:
-                        break
-                    destination.write(block)
-                    digest.update(block)
-                    written += len(block)
 
-    if written != total_size:
+            offset = max(0, cursor - logical_start)
+            with part_path.open("rb") as source:
+                source.seek(offset)
+                remaining = item.size - offset
+                while remaining > 0:
+                    block = source.read(min(COPY_BUFFER, remaining))
+                    if not block:
+                        raise RuntimeError(
+                            f"Unexpected EOF while appending chunk {item.index}"
+                        )
+                    destination.write(block)
+                    cursor += len(block)
+                    remaining -= len(block)
+
+            logical_start = logical_end
+            print(
+                f"Assembly progress: {cursor / (1024**3):.2f} / "
+                f"{total_size / (1024**3):.2f} GiB",
+                flush=True,
+            )
+
+    final_size = assembling.stat().st_size
+    if final_size != total_size:
         raise RuntimeError(
-            f"Assembled size mismatch: wrote {written}, expected {total_size}"
+            f"Assembled size mismatch: wrote {final_size}, expected {total_size}"
         )
 
-    checksum = digest.hexdigest()
+    print("Assembly complete. Verifying final MD5 ...", flush=True)
+    checksum = md5sum(assembling)
     if checksum != EXPECTED_MD5:
         raise RuntimeError(
             f"Final MD5 mismatch: {checksum} != {EXPECTED_MD5}. "
