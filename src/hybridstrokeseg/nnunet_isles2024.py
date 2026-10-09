@@ -77,6 +77,9 @@ def audit_isles2024_nnunet_geometry(
         mismatches: list[str] = []
         for channel in channel_list:
             path = getattr(case, _CHANNEL_PATHS[channel])
+            if path is None:
+                mismatches.append(f"{channel}:missing")
+                continue
             if not geometry_equal(reference, geometry_signature(path)):
                 mismatches.append(channel)
         if not geometry_equal(reference, geometry_signature(case.lesion_mask_ncct)):
@@ -86,7 +89,19 @@ def audit_isles2024_nnunet_geometry(
     return failures
 
 
-def _materialize(source: Path, destination: Path, mode: str) -> None:
+def _materialize(
+    source: Path,
+    destination: Path,
+    mode: str,
+    *,
+    resume: bool = False,
+) -> None:
+    if resume and destination.exists():
+        if mode == "copy" and destination.stat().st_size == source.stat().st_size:
+            return
+        if mode == "symlink" and destination.is_symlink():
+            return
+        destination.unlink()
     if mode == "copy":
         shutil.copy2(source, destination)
         return
@@ -105,6 +120,7 @@ def stage_isles2024_nnunet(
     channels: Sequence[str] = ("ncct",),
     mode: str = "copy",
     overwrite: bool = False,
+    resume: bool = False,
     split_seed: int = 2026,
 ) -> Path:
     """Stage leakage-safe ISLES'24 images and final-infarct labels for nnU-Net."""
@@ -134,11 +150,12 @@ def stage_isles2024_nnunet(
 
     dataset_dir = Path(output_root) / f"Dataset{dataset_id:03d}_{dataset_name}"
     if dataset_dir.exists() and any(dataset_dir.iterdir()):
-        if not overwrite:
+        if overwrite:
+            shutil.rmtree(dataset_dir)
+        elif not resume:
             raise FileExistsError(
                 f"Refusing to overwrite non-empty nnU-Net dataset directory: {dataset_dir}"
             )
-        shutil.rmtree(dataset_dir)
 
     images_tr = dataset_dir / "imagesTr"
     labels_tr = dataset_dir / "labelsTr"
@@ -156,13 +173,18 @@ def stage_isles2024_nnunet(
 
         for channel_index, channel in enumerate(channel_list):
             source = getattr(case, _CHANNEL_PATHS[channel])
+            if source is None:
+                raise ValueError(
+                    f"Case {case.case_id} is missing requested channel {channel}"
+                )
             destination = images_tr / f"{target_id}_{channel_index:04d}.nii.gz"
-            _materialize(source, destination, mode)
+            _materialize(source, destination, mode, resume=resume)
 
         _materialize(
             case.lesion_mask_ncct,
             labels_tr / f"{target_id}.nii.gz",
             mode,
+            resume=resume,
         )
 
     folds = make_patient_kfolds(tuple(nnunet_ids), n_splits=5, seed=split_seed)

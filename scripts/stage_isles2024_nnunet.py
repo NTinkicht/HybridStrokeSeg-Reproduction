@@ -25,10 +25,18 @@ def main() -> int:
     )
     parser.add_argument("--mode", choices=("copy", "symlink"), default="copy")
     parser.add_argument("--overwrite", action="store_true")
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Resume a partially staged dataset by keeping complete copied files.",
+    )
     parser.add_argument("--split-seed", type=int, default=2026)
     args = parser.parse_args()
 
-    cases = discover_isles2024_cases(args.dataset_root)
+    cases = discover_isles2024_cases(
+        args.dataset_root,
+        required_channels=args.channels,
+    )
     print(f"Discovered {len(cases)} labeled ISLES'24 training cases.")
     print(
         "ANTI-LEAKAGE: follow-up DWI/ADC, final masks, post-treatment variables, "
@@ -43,6 +51,7 @@ def main() -> int:
         channels=args.channels,
         mode=args.mode,
         overwrite=args.overwrite,
+        resume=args.resume,
         split_seed=args.split_seed,
     )
     print(f"nnU-Net raw dataset staged at: {dataset_dir}")

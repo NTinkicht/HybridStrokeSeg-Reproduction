@@ -1,35 +1,38 @@
-"""ISLES 2024 dataset discovery and geometry-audit helpers.
+"""ISLES'24 dataset discovery and geometry-audit helpers.
 
-ISLES'24 is a longitudinal infarct-prediction benchmark. Model inputs are
-pre-interventional acute CT/CTA/CTP-derived data and optional clinical
-variables. Follow-up MRI is label-generation context and must never be exposed
-to the prediction model.
+ISLES'24 is a longitudinal final-infarct prediction benchmark. Valid model
+inputs are pre-interventional acute CT/CTA/CTP-derived images and, in separate
+experiments, baseline clinical variables. Follow-up MRI is target-generation
+context and must never be exposed to the prediction model.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
 from .isles2022 import geometry_equal, geometry_signature
 
+SUPPORTED_ACUTE_CHANNELS = ("ncct", "cta", "tmax", "cbf", "cbv", "mtt")
+
 
 @dataclass(frozen=True)
 class ISLES24Case:
-    """Paths for one complete public ISLES'24 training case."""
+    """Paths for one public ISLES'24 training case."""
 
     subject_id: str
     ncct: Path
-    cta_ncct: Path
-    tmax_ncct: Path
-    cbf_ncct: Path
-    cbv_ncct: Path
-    mtt_ncct: Path
     lesion_mask_ncct: Path
-    dwi_followup_ncct: Path
-    adc_followup_ncct: Path
+    cta_ncct: Path | None = None
+    tmax_ncct: Path | None = None
+    cbf_ncct: Path | None = None
+    cbv_ncct: Path | None = None
+    mtt_ncct: Path | None = None
     baseline_csv: Path | None = None
     outcome_csv: Path | None = None
+    dwi_followup: Path | None = None
+    adc_followup: Path | None = None
     lvo_mask_ncct: Path | None = None
     cow_mask_ncct: Path | None = None
     ctp_native: Path | None = None
@@ -40,8 +43,8 @@ class ISLES24Case:
         return self.subject_id
 
     def acute_model_inputs(self) -> dict[str, Path]:
-        """Return imaging channels that are valid pre-interventional inputs."""
-        return {
+        """Return only available pre-interventional acute imaging channels."""
+        mapping = {
             "ncct": self.ncct,
             "cta": self.cta_ncct,
             "tmax": self.tmax_ncct,
@@ -49,6 +52,34 @@ class ISLES24Case:
             "cbv": self.cbv_ncct,
             "mtt": self.mtt_ncct,
         }
+        return {name: path for name, path in mapping.items() if path is not None}
+
+
+def resolve_isles2024_root(root: str | Path) -> Path:
+    """Resolve a dataset root even when the archive adds one wrapper directory."""
+    candidate = Path(root)
+    if not candidate.exists():
+        raise FileNotFoundError(candidate)
+
+    def has_core_dirs(path: Path) -> bool:
+        has_raw = (path / "rawdata").is_dir() or (path / "raw_data").is_dir()
+        return has_raw and (path / "derivatives").is_dir()
+
+    if has_core_dirs(candidate):
+        return candidate
+
+    matches: list[Path] = []
+    for path in candidate.rglob("*"):
+        if path.is_dir() and has_core_dirs(path):
+            matches.append(path)
+    matches = sorted(set(matches))
+    if len(matches) == 1:
+        return matches[0]
+    if not matches:
+        raise FileNotFoundError(
+            f"Could not find an ISLES'24 root with rawdata/raw_data and derivatives below {candidate}"
+        )
+    raise ValueError(f"Multiple candidate ISLES'24 roots found below {candidate}: {matches}")
 
 
 def _find_dataset_dir(root: Path, *names: str) -> Path:
@@ -60,33 +91,65 @@ def _find_dataset_dir(root: Path, *names: str) -> Path:
     raise FileNotFoundError(f"Expected one of [{joined}] below {root}")
 
 
-def _single_recursive_match(directory: Path, pattern: str) -> Path:
-    matches = sorted(directory.rglob(pattern))
-    if len(matches) != 1:
+def _single_recursive_match(directory: Path, patterns: Iterable[str]) -> Path:
+    matches: set[Path] = set()
+    pattern_list = tuple(patterns)
+    for pattern in pattern_list:
+        matches.update(directory.rglob(pattern))
+    ordered = sorted(matches)
+    if len(ordered) != 1:
         raise ValueError(
-            f"Expected exactly one '{pattern}' below {directory}, found {len(matches)}"
+            f"Expected exactly one of {pattern_list!r} below {directory}, found {len(ordered)}"
         )
-    return matches[0]
+    return ordered[0]
 
 
-def _optional_recursive_match(directory: Path, pattern: str) -> Path | None:
-    matches = sorted(directory.rglob(pattern))
-    if len(matches) > 1:
+def _optional_recursive_match(directory: Path, patterns: Iterable[str]) -> Path | None:
+    if not directory.is_dir():
+        return None
+    matches: set[Path] = set()
+    pattern_list = tuple(patterns)
+    for pattern in pattern_list:
+        matches.update(directory.rglob(pattern))
+    ordered = sorted(matches)
+    if len(ordered) > 1:
         raise ValueError(
-            f"Expected at most one '{pattern}' below {directory}, found {len(matches)}"
+            f"Expected at most one of {pattern_list!r} below {directory}, found {len(ordered)}"
         )
-    return matches[0] if matches else None
+    return ordered[0] if ordered else None
 
 
-def discover_isles2024_cases(root: str | Path) -> list[ISLES24Case]:
-    """Discover complete labeled public ISLES'24 training cases.
+def _required_or_optional(
+    directory: Path,
+    patterns: tuple[str, ...],
+    *,
+    required: bool,
+) -> Path | None:
+    if required:
+        return _single_recursive_match(directory, patterns)
+    return _optional_recursive_match(directory, patterns)
 
-    The current public release is BIDS-like and provides native acute images in
-    raw_data plus derivatives co-registered to NCCT. Some historical package
-    versions used rawdata; both spellings are accepted.
+
+def discover_isles2024_cases(
+    root: str | Path,
+    *,
+    required_channels: Iterable[str] = SUPPORTED_ACUTE_CHANNELS,
+) -> list[ISLES24Case]:
+    """Discover public ISLES'24 training cases.
+
+    The official BIDS-style structure uses rawdata plus derivatives.
+    raw_data is accepted as a compatibility alias. required_channels allows
+    selective extraction workflows such as ("ncct",) for the first baseline.
     """
-    dataset_root = Path(root)
-    raw_root = _find_dataset_dir(dataset_root, "raw_data", "rawdata")
+    required = tuple(str(channel).lower() for channel in required_channels)
+    unknown = sorted(set(required) - set(SUPPORTED_ACUTE_CHANNELS))
+    if unknown:
+        raise ValueError(f"Unsupported ISLES'24 acute channels: {unknown}")
+    if "ncct" not in required:
+        required = ("ncct",) + required
+
+    dataset_root = resolve_isles2024_root(root)
+    raw_root = _find_dataset_dir(dataset_root, "rawdata", "raw_data")
     derivatives_root = _find_dataset_dir(dataset_root, "derivatives")
     phenotype_root = dataset_root / "phenotype"
 
@@ -98,70 +161,87 @@ def discover_isles2024_cases(root: str | Path) -> list[ISLES24Case]:
     for raw_subject in subject_dirs:
         subject_id = raw_subject.name
         acute_raw = raw_subject / "ses-0001"
+        followup_raw = raw_subject / "ses-0002"
         derivative_subject = derivatives_root / subject_id
         acute_derivative = derivative_subject / "ses-0001"
         followup_derivative = derivative_subject / "ses-0002"
 
         if not acute_raw.is_dir():
             raise FileNotFoundError(f"Missing acute raw session: {acute_raw}")
-        if not acute_derivative.is_dir():
-            raise FileNotFoundError(f"Missing acute derivative session: {acute_derivative}")
         if not followup_derivative.is_dir():
             raise FileNotFoundError(
-                f"Missing follow-up derivative session: {followup_derivative}"
+                f"Missing follow-up derivative session with final infarct mask: {followup_derivative}"
             )
+        if any(channel != "ncct" for channel in required) and not acute_derivative.is_dir():
+            raise FileNotFoundError(f"Missing acute derivative session: {acute_derivative}")
 
         baseline_csv = None
         outcome_csv = None
         if phenotype_root.is_dir():
             baseline_csv = _optional_recursive_match(
                 phenotype_root / "ses-0001",
-                f"*{subject_id}*demographic_baseline.csv",
+                (f"*{subject_id}*demographic_baseline.csv",),
             )
             outcome_csv = _optional_recursive_match(
                 phenotype_root / "ses-0002",
-                f"*{subject_id}*outcome.csv",
+                (f"*{subject_id}*outcome.csv",),
             )
 
         cases.append(
             ISLES24Case(
                 subject_id=subject_id,
-                ncct=_single_recursive_match(acute_raw, "*_ncct.nii.gz"),
-                cta_ncct=_single_recursive_match(
-                    acute_derivative, "*space-ncct_cta.nii.gz"
-                ),
-                tmax_ncct=_single_recursive_match(
-                    acute_derivative, "*space-ncct_tmax.nii.gz"
-                ),
-                cbf_ncct=_single_recursive_match(
-                    acute_derivative, "*space-ncct_cbf.nii.gz"
-                ),
-                cbv_ncct=_single_recursive_match(
-                    acute_derivative, "*space-ncct_cbv.nii.gz"
-                ),
-                mtt_ncct=_single_recursive_match(
-                    acute_derivative, "*space-ncct_mtt.nii.gz"
-                ),
+                ncct=_single_recursive_match(acute_raw, ("*_ncct.nii.gz",)),
                 lesion_mask_ncct=_single_recursive_match(
-                    followup_derivative, "*space-ncct_lesion-msk.nii.gz"
+                    followup_derivative,
+                    ("*_lesion-msk.nii.gz", "*space-ncct*lesion-msk.nii.gz"),
                 ),
-                dwi_followup_ncct=_single_recursive_match(
-                    followup_derivative, "*space-ncct_dwi.nii.gz"
+                cta_ncct=_required_or_optional(
+                    acute_derivative,
+                    ("*space-ncct_cta.nii.gz",),
+                    required="cta" in required,
                 ),
-                adc_followup_ncct=_single_recursive_match(
-                    followup_derivative, "*space-ncct_adc.nii.gz"
+                tmax_ncct=_required_or_optional(
+                    acute_derivative,
+                    ("*space-ncct_tmax.nii.gz",),
+                    required="tmax" in required,
+                ),
+                cbf_ncct=_required_or_optional(
+                    acute_derivative,
+                    ("*space-ncct_cbf.nii.gz",),
+                    required="cbf" in required,
+                ),
+                cbv_ncct=_required_or_optional(
+                    acute_derivative,
+                    ("*space-ncct_cbv.nii.gz",),
+                    required="cbv" in required,
+                ),
+                mtt_ncct=_required_or_optional(
+                    acute_derivative,
+                    ("*space-ncct_mtt.nii.gz",),
+                    required="mtt" in required,
                 ),
                 baseline_csv=baseline_csv,
                 outcome_csv=outcome_csv,
+                dwi_followup=_optional_recursive_match(
+                    followup_raw,
+                    ("*_dwi.nii.gz",),
+                ),
+                adc_followup=_optional_recursive_match(
+                    followup_raw,
+                    ("*_adc.nii.gz",),
+                ),
                 lvo_mask_ncct=_optional_recursive_match(
-                    acute_derivative, "*space-ncct_lvo-msk.nii.gz"
+                    acute_derivative,
+                    ("*space-ncct_lvo-msk.nii.gz",),
                 ),
                 cow_mask_ncct=_optional_recursive_match(
-                    acute_derivative, "*space-ncct_cow-msk.nii.gz"
+                    acute_derivative,
+                    ("*space-ncct_cow-msk.nii.gz",),
                 ),
-                ctp_native=_optional_recursive_match(acute_raw, "*_ctp.nii.gz"),
+                ctp_native=_optional_recursive_match(acute_raw, ("*_ctp.nii.gz",)),
                 ctp_ncct=_optional_recursive_match(
-                    acute_derivative, "*space-ncct_ctp.nii.gz"
+                    acute_derivative,
+                    ("*space-ncct_ctp.nii.gz",),
                 ),
             )
         )
@@ -173,7 +253,7 @@ def discover_isles2024_cases(root: str | Path) -> list[ISLES24Case]:
 
 
 def case_geometry_report_isles2024(case: ISLES24Case) -> dict[str, object]:
-    """Audit whether acute inputs and final-infarct mask share the NCCT grid."""
+    """Audit available acute inputs and the final-infarct mask against NCCT."""
     reference = geometry_signature(case.ncct)
     inputs = case.acute_model_inputs()
     signatures = {name: geometry_signature(path) for name, path in inputs.items()}
@@ -189,6 +269,8 @@ def case_geometry_report_isles2024(case: ISLES24Case) -> dict[str, object]:
         "geometry": signatures | {"lesion_mask": mask_signature},
         "has_baseline_csv": case.baseline_csv is not None,
         "has_outcome_csv": case.outcome_csv is not None,
+        "has_dwi_followup": case.dwi_followup is not None,
+        "has_adc_followup": case.adc_followup is not None,
         "has_lvo_mask": case.lvo_mask_ncct is not None,
         "has_cow_mask": case.cow_mask_ncct is not None,
         "has_native_ctp": case.ctp_native is not None,
@@ -197,9 +279,15 @@ def case_geometry_report_isles2024(case: ISLES24Case) -> dict[str, object]:
 
 
 def summarize_isles2024(cases: list[ISLES24Case]) -> dict[str, int]:
-    """Summarize completeness and NCCT-grid compatibility."""
+    """Summarize available data and NCCT-grid compatibility."""
     summary = {
         "cases": len(cases),
+        "ncct_present": len(cases),
+        "cta_present": 0,
+        "tmax_present": 0,
+        "cbf_present": 0,
+        "cbv_present": 0,
+        "mtt_present": 0,
         "cta_matches_ncct": 0,
         "tmax_matches_ncct": 0,
         "cbf_matches_ncct": 0,
@@ -208,6 +296,8 @@ def summarize_isles2024(cases: list[ISLES24Case]) -> dict[str, int]:
         "lesion_mask_matches_ncct": 0,
         "baseline_csv_present": 0,
         "outcome_csv_present": 0,
+        "dwi_followup_present": 0,
+        "adc_followup_present": 0,
         "lvo_mask_present": 0,
         "cow_mask_present": 0,
         "native_ctp_present": 0,
@@ -216,12 +306,18 @@ def summarize_isles2024(cases: list[ISLES24Case]) -> dict[str, int]:
     for case in cases:
         report = case_geometry_report_isles2024(case)
         matches = report["matches_ncct"]
+        inputs = case.acute_model_inputs()
         for name in ("cta", "tmax", "cbf", "cbv", "mtt"):
-            summary[f"{name}_matches_ncct"] += int(matches[name])
+            present = name in inputs
+            summary[f"{name}_present"] += int(present)
+            if present:
+                summary[f"{name}_matches_ncct"] += int(matches[name])
         summary["lesion_mask_matches_ncct"] += int(matches["lesion_mask"])
         for field in (
             "baseline_csv",
             "outcome_csv",
+            "dwi_followup",
+            "adc_followup",
             "lvo_mask",
             "cow_mask",
             "native_ctp",
