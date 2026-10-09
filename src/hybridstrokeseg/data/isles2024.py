@@ -91,6 +91,27 @@ def _find_dataset_dir(root: Path, *names: str) -> Path:
     raise FileNotFoundError(f"Expected one of [{joined}] below {root}")
 
 
+def _find_session_dir(root: Path, phase: int, *, required: bool = True) -> Path:
+    """Resolve BIDS session labels used by ISLES'24 releases.
+
+    The downloaded Zenodo v7 archive uses ses-01/ses-02. Older project
+    assumptions used ses-0001/ses-0002, so both are accepted for robustness.
+    """
+    names = (
+        f"ses-{phase:02d}",
+        f"ses-{phase:04d}",
+        f"ses-{phase}",
+    )
+    for name in names:
+        candidate = root / name
+        if candidate.is_dir():
+            return candidate
+    if required:
+        joined = ", ".join(names)
+        raise FileNotFoundError(f"Expected one of [{joined}] below {root}")
+    return root / names[0]
+
+
 def _single_recursive_match(directory: Path, patterns: Iterable[str]) -> Path:
     matches: set[Path] = set()
     pattern_list = tuple(patterns)
@@ -160,30 +181,31 @@ def discover_isles2024_cases(
 
     for raw_subject in subject_dirs:
         subject_id = raw_subject.name
-        acute_raw = raw_subject / "ses-0001"
-        followup_raw = raw_subject / "ses-0002"
+        acute_raw = _find_session_dir(raw_subject, 1)
+        followup_raw = _find_session_dir(raw_subject, 2, required=False)
         derivative_subject = derivatives_root / subject_id
-        acute_derivative = derivative_subject / "ses-0001"
-        followup_derivative = derivative_subject / "ses-0002"
+        acute_derivative = _find_session_dir(
+            derivative_subject,
+            1,
+            required=any(channel != "ncct" for channel in required),
+        )
+        followup_derivative = _find_session_dir(derivative_subject, 2)
 
-        if not acute_raw.is_dir():
-            raise FileNotFoundError(f"Missing acute raw session: {acute_raw}")
         if not followup_derivative.is_dir():
             raise FileNotFoundError(
-                f"Missing follow-up derivative session with final infarct mask: {followup_derivative}"
+                "Missing follow-up derivative session with final infarct mask: "
+                f"{followup_derivative}"
             )
-        if any(channel != "ncct" for channel in required) and not acute_derivative.is_dir():
-            raise FileNotFoundError(f"Missing acute derivative session: {acute_derivative}")
 
         baseline_csv = None
         outcome_csv = None
         if phenotype_root.is_dir():
             baseline_csv = _optional_recursive_match(
-                phenotype_root / "ses-0001",
+                _find_session_dir(phenotype_root, 1, required=False),
                 (f"*{subject_id}*demographic_baseline.csv",),
             )
             outcome_csv = _optional_recursive_match(
-                phenotype_root / "ses-0002",
+                _find_session_dir(phenotype_root, 2, required=False),
                 (f"*{subject_id}*outcome.csv",),
             )
 
