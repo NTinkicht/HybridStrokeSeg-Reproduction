@@ -28,34 +28,34 @@ from pathlib import Path
 EXPECTED_CASES = 149
 
 CATEGORY_PATTERNS: dict[str, re.Pattern[str]] = {
-    "ncct": re.compile(r"/raw_?data/sub-[^/]+/ses-0001/[^/]*_ncct\.nii\.gz$", re.I),
+    "ncct": re.compile(r"/raw_?data/sub-[^/]+/ses-0001/[^/]*_ncct\.nii\.gz$", re.IGNORECASE),
     "cta": re.compile(
         r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_cta\.nii\.gz$",
-        re.I,
+        re.IGNORECASE,
     ),
     "tmax": re.compile(
         r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_tmax\.nii\.gz$",
-        re.I,
+        re.IGNORECASE,
     ),
     "cbf": re.compile(
         r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_cbf\.nii\.gz$",
-        re.I,
+        re.IGNORECASE,
     ),
     "cbv": re.compile(
         r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_cbv\.nii\.gz$",
-        re.I,
+        re.IGNORECASE,
     ),
     "mtt": re.compile(
         r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_mtt\.nii\.gz$",
-        re.I,
+        re.IGNORECASE,
     ),
     "lesion_mask": re.compile(
         r"/derivatives/sub-[^/]+/ses-0002/[^/]*_lesion-msk\.nii\.gz$",
-        re.I,
+        re.IGNORECASE,
     ),
     "baseline_csv": re.compile(
         r"/phenotype/ses-0001/[^/]*_demographic_baseline\.csv$",
-        re.I,
+        re.IGNORECASE,
     ),
 }
 
@@ -68,7 +68,7 @@ REQUIRED_IMAGING_CATEGORIES = (
     "mtt",
     "lesion_mask",
 )
-SUBJECT_RE = re.compile(r"(sub-[^/]+)", re.I)
+SUBJECT_RE = re.compile(r"(sub-[^/]+)", re.IGNORECASE)
 
 
 def find_7z() -> str:
