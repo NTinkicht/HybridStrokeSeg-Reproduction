@@ -6,7 +6,7 @@ experiments we only need:
 - acute NCCT;
 - registered CTA;
 - registered perfusion maps (Tmax, CBF, CBV, MTT);
-- final infarct labels from derivatives/ses-0002;
+- final infarct labels from derivatives/ses-02;
 - baseline clinical CSV files.
 
 Follow-up DWI/ADC, post-treatment outcomes, and raw 4-D CTP are deliberately
@@ -28,33 +28,33 @@ from pathlib import Path
 EXPECTED_CASES = 149
 
 CATEGORY_PATTERNS: dict[str, re.Pattern[str]] = {
-    "ncct": re.compile(r"/raw_?data/sub-[^/]+/ses-0001/[^/]*_ncct\.nii\.gz$", re.IGNORECASE),
+    "ncct": re.compile(r"/raw_?data/sub-[^/]+/ses-0*1/[^/]*_ncct\.nii\.gz$", re.IGNORECASE),
     "cta": re.compile(
-        r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_cta\.nii\.gz$",
+        r"/derivatives/sub-[^/]+/ses-0*1/.*/?[^/]*space-ncct_cta\.nii\.gz$",
         re.IGNORECASE,
     ),
     "tmax": re.compile(
-        r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_tmax\.nii\.gz$",
+        r"/derivatives/sub-[^/]+/ses-0*1/.*/?[^/]*space-ncct_tmax\.nii\.gz$",
         re.IGNORECASE,
     ),
     "cbf": re.compile(
-        r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_cbf\.nii\.gz$",
+        r"/derivatives/sub-[^/]+/ses-0*1/.*/?[^/]*space-ncct_cbf\.nii\.gz$",
         re.IGNORECASE,
     ),
     "cbv": re.compile(
-        r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_cbv\.nii\.gz$",
+        r"/derivatives/sub-[^/]+/ses-0*1/.*/?[^/]*space-ncct_cbv\.nii\.gz$",
         re.IGNORECASE,
     ),
     "mtt": re.compile(
-        r"/derivatives/sub-[^/]+/ses-0001/.*/?[^/]*space-ncct_mtt\.nii\.gz$",
+        r"/derivatives/sub-[^/]+/ses-0*1/.*/?[^/]*space-ncct_mtt\.nii\.gz$",
         re.IGNORECASE,
     ),
     "lesion_mask": re.compile(
-        r"/derivatives/sub-[^/]+/ses-0002/[^/]*_lesion-msk\.nii\.gz$",
+        r"/derivatives/sub-[^/]+/ses-0*2/[^/]*_lesion-msk\.nii\.gz$",
         re.IGNORECASE,
     ),
     "baseline_csv": re.compile(
-        r"/phenotype/ses-0001/[^/]*_demographic_baseline\.csv$",
+        r"/phenotype/ses-0*1/[^/]*_demographic_baseline\.csv$",
         re.IGNORECASE,
     ),
 }
