@@ -52,6 +52,10 @@ ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **lo
 
 [![Open ISLES'24 parallel downloader in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/05_download_isles2024_parallel_to_drive.ipynb)
 
+[![Prepare ISLES'24 core + NCCT baseline in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/08_prepare_isles2024_core_and_ncct_baseline.ipynb)
+
+After the 99 GB archive is complete, this notebook selectively extracts the core modeling subset, audits all 149 cases, and stages the first persistent NCCT-only nnU-Net v2 dataset on deterministic five-fold patient splits.
+
 The recommended downloader stores independent 1 GiB byte-range chunks in Google Drive and fetches **four chunks in parallel**. Completed chunks survive Colab disconnects, partial chunks resume, and any partial archive produced by the older sequential downloader is preserved as the already-downloaded prefix. After every range is present, the notebook assembles `train.7z`, verifies the current Zenodo v7 MD5, then removes the temporary chunks.
 
 The older single-stream notebook remains in the repository as a fallback, but the parallel chunked notebook is preferred for unstable Colab sessions.
