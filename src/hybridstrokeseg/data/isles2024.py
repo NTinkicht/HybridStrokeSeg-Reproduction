@@ -15,6 +15,7 @@ from pathlib import Path
 from .isles2022 import geometry_equal, geometry_signature
 
 SUPPORTED_ACUTE_CHANNELS = ("ncct", "cta", "tmax", "cbf", "cbv", "mtt")
+ISLES2024_GEOMETRY_ATOL = 2e-5
 
 
 @dataclass(frozen=True)
@@ -274,6 +275,21 @@ def discover_isles2024_cases(
     return cases
 
 
+def geometry_equal_isles2024(
+    first: dict[str, object],
+    second: dict[str, object],
+) -> bool:
+    """Compare ISLES'24 grids with tolerance for NIfTI qform/sform rounding.
+
+    One released case stores the NCCT transform in the sform and the derived
+    lesion-mask transform in the qform. Their physical grids are equivalent,
+    but float32 header round-tripping produces a maximum direction-cosine
+    difference of about 1.6e-5. A 2e-5 absolute tolerance accepts that benign
+    representation difference while still rejecting meaningful grid changes.
+    """
+    return geometry_equal(first, second, atol=ISLES2024_GEOMETRY_ATOL)
+
+
 def case_geometry_report_isles2024(case: ISLES24Case) -> dict[str, object]:
     """Audit available acute inputs and the final-infarct mask against NCCT."""
     reference = geometry_signature(case.ncct)
@@ -283,10 +299,10 @@ def case_geometry_report_isles2024(case: ISLES24Case) -> dict[str, object]:
     return {
         "case_id": case.case_id,
         "matches_ncct": {
-            name: geometry_equal(reference, signature)
+            name: geometry_equal_isles2024(reference, signature)
             for name, signature in signatures.items()
         }
-        | {"lesion_mask": geometry_equal(reference, mask_signature)},
+        | {"lesion_mask": geometry_equal_isles2024(reference, mask_signature)},
         "ncct_geometry": reference,
         "geometry": signatures | {"lesion_mask": mask_signature},
         "has_baseline_csv": case.baseline_csv is not None,

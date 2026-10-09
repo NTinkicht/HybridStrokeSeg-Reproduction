@@ -12,8 +12,8 @@ import shutil
 from collections.abc import Sequence
 from pathlib import Path
 
-from .data.isles2022 import geometry_equal, geometry_signature
-from .data.isles2024 import ISLES24Case
+from .data.isles2022 import geometry_signature
+from .data.isles2024 import ISLES24Case, geometry_equal_isles2024
 from .splits import make_patient_kfolds
 
 SUPPORTED_ISLES24_CHANNELS = ("ncct", "cta", "tmax", "cbf", "cbv", "mtt")
@@ -80,9 +80,9 @@ def audit_isles2024_nnunet_geometry(
             if path is None:
                 mismatches.append(f"{channel}:missing")
                 continue
-            if not geometry_equal(reference, geometry_signature(path)):
+            if not geometry_equal_isles2024(reference, geometry_signature(path)):
                 mismatches.append(channel)
-        if not geometry_equal(reference, geometry_signature(case.lesion_mask_ncct)):
+        if not geometry_equal_isles2024(reference, geometry_signature(case.lesion_mask_ncct)):
             mismatches.append("lesion_mask")
         if mismatches:
             failures[case.case_id] = mismatches
