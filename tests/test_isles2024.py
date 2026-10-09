@@ -1,6 +1,9 @@
 from pathlib import Path
 
-from hybridstrokeseg.data.isles2024 import discover_isles2024_cases
+from hybridstrokeseg.data.isles2024 import (
+    discover_isles2024_cases,
+    geometry_equal_isles2024,
+)
 
 
 def _touch(path: Path) -> None:
@@ -74,3 +77,31 @@ def test_discover_isles2024_accepts_legacy_long_session_labels(tmp_path: Path) -
 
     cases = discover_isles2024_cases(tmp_path, required_channels=("ncct",))
     assert [case.case_id for case in cases] == [subject]
+
+
+def test_isles2024_geometry_tolerance_accepts_header_rounding_only():
+    base = {
+        "size_xyz": (512, 661, 44),
+        "spacing_xyz": (0.34019515, 0.34019530, 3.99999523),
+        "origin_xyz": (97.25445557, 334.91110229, -703.60015869),
+        "direction": (
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+        ),
+    }
+    rounded = dict(base)
+    rounded["direction"] = (
+        1.0, 0.0, 1.58e-5,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0,
+    )
+    meaningful_mismatch = dict(base)
+    meaningful_mismatch["direction"] = (
+        1.0, 0.0, 1e-3,
+        0.0, 1.0, 0.0,
+        0.0, 0.0, 1.0,
+    )
+
+    assert geometry_equal_isles2024(base, rounded)
+    assert not geometry_equal_isles2024(base, meaningful_mismatch)
