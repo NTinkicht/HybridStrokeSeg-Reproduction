@@ -128,8 +128,12 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.scratch_dir.mkdir(parents=True, exist_ok=True)
 
+    config_dir = source_preprocessed / "nnUNetPlans_3d_fullres"
+    if not config_dir.is_dir():
+        raise FileNotFoundError(config_dir)
+
     case_files: dict[str, list[Path]] = {}
-    for path in source_preprocessed.iterdir():
+    for path in config_dir.iterdir():
         if not path.is_file():
             continue
         match = CASE_RE.match(path.name)
@@ -138,8 +142,21 @@ def main() -> int:
 
     subjects = sorted(case_files)
     if len(subjects) != 149:
+        sample = sorted(path.name for path in config_dir.iterdir() if path.is_file())[:20]
         raise RuntimeError(
-            f"Expected 149 preprocessed subjects, found {len(subjects)}"
+            f"Expected 149 preprocessed subjects in {config_dir}, found "
+            f"{len(subjects)}. Sample files: {sample}"
+        )
+
+    wrong_counts = {
+        subject: len(paths)
+        for subject, paths in case_files.items()
+        if len(paths) != 3
+    }
+    if wrong_counts:
+        raise RuntimeError(
+            "Expected exactly three preprocessed files per subject "
+            f"(.b2nd, _seg.b2nd, .pkl); mismatches: {dict(list(wrong_counts.items())[:10])}"
         )
 
     gt_dir = source_preprocessed / "gt_segmentations"
@@ -148,6 +165,7 @@ def main() -> int:
 
     bundle_root = Path("isles2024_fold4_resume")
     pre_arc = bundle_root / "nnUNet_preprocessed" / args.dataset_name
+    config_arc = pre_arc / "nnUNetPlans_3d_fullres"
 
     shard_manifest: list[dict[str, object]] = []
 
@@ -176,7 +194,7 @@ def main() -> int:
         entries: list[tuple[Path, Path]] = []
         for subject in batch:
             for source in sorted(case_files[subject]):
-                entries.append((source, pre_arc / source.name))
+                entries.append((source, config_arc / source.name))
             gt = gt_dir / f"{subject}.nii.gz"
             entries.append((gt, pre_arc / "gt_segmentations" / gt.name))
 
@@ -200,6 +218,7 @@ def main() -> int:
         "dataset_fingerprint.json",
         "nnUNetPlans.json",
         "splits_final.json",
+        ".hybridstrokeseg_preprocess_complete",
     ):
         source = source_preprocessed / name
         if source.is_file():
