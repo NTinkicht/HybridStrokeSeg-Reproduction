@@ -6,7 +6,9 @@ lived Colab sessions. Re-running it:
 - skips completed preprocessing;
 - restores the deterministic patient folds;
 - skips folds with checkpoint_final.pth;
-- resumes interrupted folds from nnU-Net's latest checkpoint via --c.
+- resumes interrupted folds from nnU-Net's latest checkpoint via --c;
+- can cache preprocessed tensors on Colab's local SSD so dataloader workers do
+  not depend on Google Drive FUSE during training.
 
 The default experiment is Dataset504 / 3d_fullres / five folds.
 """
@@ -18,6 +20,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 
@@ -42,6 +45,167 @@ def fold_complete(results_root: Path, dataset_name: str, fold: int) -> bool:
         return False
     matches = list(dataset_results.glob(f"*/fold_{fold}/checkpoint_final.pth"))
     return bool(matches)
+
+
+def case_ids_from_splits(split_path: Path) -> list[str]:
+    splits = json.loads(split_path.read_text(encoding="utf-8"))
+    case_ids: set[str] = set()
+    for split in splits:
+        case_ids.update(split.get("train", []))
+        case_ids.update(split.get("val", []))
+    if not case_ids:
+        raise RuntimeError(f"No case IDs found in split file: {split_path}")
+    return sorted(case_ids)
+
+
+def configuration_dir(dataset_path: Path, configuration: str) -> Path:
+    expected = dataset_path / f"nnUNetPlans_{configuration}"
+    if expected.is_dir():
+        return expected
+
+    matches = sorted(
+        path
+        for path in dataset_path.iterdir()
+        if path.is_dir() and path.name.endswith(f"_{configuration}")
+    ) if dataset_path.is_dir() else []
+    if len(matches) == 1:
+        return matches[0]
+    return expected
+
+
+def missing_preprocessed_files(
+    dataset_path: Path,
+    configuration: str,
+) -> list[Path]:
+    split_path = dataset_path / "splits_final.json"
+    if not split_path.is_file():
+        return [split_path]
+
+    config_path = configuration_dir(dataset_path, configuration)
+    if not config_path.is_dir():
+        return [config_path]
+
+    missing: list[Path] = []
+    for case_id in case_ids_from_splits(split_path):
+        for suffix in (".b2nd", "_seg.b2nd", ".pkl"):
+            path = config_path / f"{case_id}{suffix}"
+            try:
+                if not path.is_file() or path.stat().st_size <= 0:
+                    missing.append(path)
+            except OSError:
+                missing.append(path)
+    return missing
+
+
+def cache_preprocessed_dataset(
+    source_dataset: Path,
+    cache_root: Path,
+    configuration: str,
+    *,
+    retries: int,
+) -> Path:
+    """Copy persistent preprocessing to local storage and verify every case."""
+    cache_root.mkdir(parents=True, exist_ok=True)
+    cache_dataset = cache_root / source_dataset.name
+    retries = max(1, retries)
+
+    last_error: Exception | None = None
+    for attempt in range(1, retries + 1):
+        print(
+            f"Local preprocessing cache: copy attempt {attempt}/{retries} "
+            f"from {source_dataset} to {cache_dataset}",
+            flush=True,
+        )
+        try:
+            shutil.copytree(
+                source_dataset,
+                cache_dataset,
+                dirs_exist_ok=True,
+                copy_function=shutil.copy2,
+            )
+            last_error = None
+        except (OSError, shutil.Error) as exc:
+            last_error = exc
+            print(f"Local cache copy warning: {exc}", flush=True)
+
+        missing = missing_preprocessed_files(cache_dataset, configuration)
+        if not missing:
+            print(
+                "Local preprocessing cache verified for every case; "
+                "training will read tensors from local SSD.",
+                flush=True,
+            )
+            return cache_dataset
+
+        preview = ", ".join(str(path.name) for path in missing[:8])
+        print(
+            f"Local cache verification found {len(missing)} missing/empty "
+            f"preprocessed files: {preview}",
+            flush=True,
+        )
+        if attempt < retries:
+            time.sleep(3)
+
+    detail = f" Last copy error: {last_error}" if last_error else ""
+    raise RuntimeError(
+        f"Could not build a complete local preprocessing cache after "
+        f"{retries} attempt(s).{detail}"
+    )
+
+
+def preprocess_into_local_cache(
+    *,
+    raw_dataset: Path,
+    cache_root: Path,
+    dataset_id: int,
+    dataset_name: str,
+    configuration: str,
+    env: dict[str, str],
+) -> Path:
+    """Recreate preprocessing locally when the persistent Drive copy is incomplete."""
+    cache_root.mkdir(parents=True, exist_ok=True)
+    local_dataset = cache_root / dataset_name
+    if local_dataset.exists():
+        shutil.rmtree(local_dataset)
+
+    local_env = env.copy()
+    local_env["nnUNet_preprocessed"] = str(cache_root)
+
+    print(
+        "Persistent preprocessing could not be cached reliably. "
+        "Rebuilding preprocessing on local SSD from the staged raw dataset.",
+        flush=True,
+    )
+    run(
+        [
+            "nnUNetv2_plan_and_preprocess",
+            "-d",
+            str(dataset_id),
+            "--verify_dataset_integrity",
+            "-c",
+            configuration,
+        ],
+        env=local_env,
+    )
+
+    split_source = raw_dataset / "splits_final.json"
+    if not split_source.is_file():
+        raise FileNotFoundError(split_source)
+    shutil.copy2(split_source, local_dataset / "splits_final.json")
+
+    missing = missing_preprocessed_files(local_dataset, configuration)
+    if missing:
+        preview = ", ".join(str(path) for path in missing[:8])
+        raise RuntimeError(
+            f"Local preprocessing rebuild is incomplete: {len(missing)} "
+            f"missing/empty files. First entries: {preview}"
+        )
+
+    print(
+        "Local preprocessing rebuild verified; training can resume safely.",
+        flush=True,
+    )
+    return local_dataset
 
 
 def write_status(
@@ -91,6 +255,21 @@ def main() -> int:
         action="store_true",
         help="Require existing preprocessing and proceed directly to training.",
     )
+    parser.add_argument(
+        "--local-preprocessed-cache",
+        type=Path,
+        default=None,
+        help=(
+            "Optional local cache root for preprocessed tensors. Recommended "
+            "for Colab so nnU-Net dataloader workers do not mmap Google Drive."
+        ),
+    )
+    parser.add_argument(
+        "--cache-copy-retries",
+        type=int,
+        default=3,
+        help="Attempts to copy and verify the persistent preprocessing cache.",
+    )
     args = parser.parse_args()
 
     for fold in args.folds:
@@ -117,6 +296,7 @@ def main() -> int:
     status_json = args.status_json or results_root / "isles2024_ncct_cv_status.json"
 
     env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
 
     if not preprocess_marker.exists():
         if args.skip_preprocessing:
@@ -160,6 +340,33 @@ def main() -> int:
         if split_source.is_file():
             shutil.copy2(split_source, preprocessed_dataset / "splits_final.json")
 
+    training_env = env.copy()
+    if args.local_preprocessed_cache is not None:
+        try:
+            cache_preprocessed_dataset(
+                preprocessed_dataset,
+                args.local_preprocessed_cache,
+                args.configuration,
+                retries=args.cache_copy_retries,
+            )
+        except RuntimeError as exc:
+            print(f"Persistent-cache copy failed: {exc}", flush=True)
+            preprocess_into_local_cache(
+                raw_dataset=raw_dataset,
+                cache_root=args.local_preprocessed_cache,
+                dataset_id=args.dataset_id,
+                dataset_name=dataset_name,
+                configuration=args.configuration,
+                env=env,
+            )
+
+        training_env["nnUNet_preprocessed"] = str(args.local_preprocessed_cache)
+        print(
+            f"Training nnUNet_preprocessed: "
+            f"{training_env['nnUNet_preprocessed']}",
+            flush=True,
+        )
+
     write_status(
         status_json,
         dataset_name=dataset_name,
@@ -189,7 +396,7 @@ def main() -> int:
                 "-device",
                 "cuda",
             ],
-            env=env,
+            env=training_env,
         )
         write_status(
             status_json,
