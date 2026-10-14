@@ -23,3 +23,33 @@ jobs:
         run: pytest
       - name: Ruff
         run: ruff check src tests scripts
+
+  evaluation-runtime-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install Colab wheel-only evaluation dependencies
+        run: |
+          python -m pip install --only-binary=:all: "nibabel>=5.2,<6" "connected-components-3d>=3.12,<4" "surface-distance>=0.1,<1" "pyyaml>=6,<7"
+          python -m pip install --only-binary=:all: --no-deps "panoptica==1.5.1"
+      - name: Exercise official-style evaluator API on synthetic data
+        env:
+          PYTHONPATH: src
+        run: |
+          python - <<'PY'
+          import numpy as np
+          from hybridstrokeseg.isles2024_eval import evaluate_case
+          mask = np.zeros((7, 7, 7), dtype=np.uint8)
+          mask[2:5, 2:5, 2:5] = 1
+          out = evaluate_case(
+              case_id="synthetic", fold=0, reference=mask,
+              prediction=mask.copy(), voxel_volume_ml=0.001,
+          )
+          assert abs(out.dice - 1.0) < 1e-8, out
+          assert abs(out.lesion_f1 - 1.0) < 1e-8, out
+          print(out)
+          PY
