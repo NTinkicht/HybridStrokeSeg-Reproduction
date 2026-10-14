@@ -94,6 +94,29 @@ def validate_oof_splits(
         raise ValueError(
             f"OOF validation coverage mismatch. Missing={missing}, extra={extra}"
         )
+    # Patient-level validation must also ensure each fold is a genuine
+    # partition: every held-out subject is absent from the training list,
+    # and every other expected subject is present exactly once.
+    for fold_index, split in enumerate(splits):
+        train_ids = split["train"]
+        val_ids = split["val"]
+        train_set = set(train_ids)
+        val_set = set(val_ids)
+        if len(train_ids) != len(train_set):
+            raise ValueError(f"Fold {fold_index} has duplicate training case IDs")
+        overlap = sorted(train_set & val_set)
+        if overlap:
+            raise ValueError(
+                f"Fold {fold_index} has train/validation patient leakage: {overlap}"
+            )
+        expected_train = expected - val_set
+        if train_set != expected_train:
+            raise ValueError(
+                f"Fold {fold_index} training partition is incomplete or unexpected: "
+                f"missing={sorted(expected_train - train_set)}, "
+                f"extra={sorted(train_set - expected_train)}"
+            )
+
     return sorted(unique)
 
 
