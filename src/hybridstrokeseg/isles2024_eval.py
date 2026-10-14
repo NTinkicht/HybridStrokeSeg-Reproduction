@@ -124,7 +124,7 @@ def load_binary_mask(image) -> np.ndarray:
     """Decode a NIfTI proxy directly to bool without a float64 get_fdata cache.
 
     nibabel proxies apply any on-disk scaling during np.asanyarray, so the
-    foreground definition remains exactly the original nonzero threshold.
+    foreground definition remains exactly the original strictly-positive threshold.
     """
     return np.asanyarray(image.dataobj) > 0
 
