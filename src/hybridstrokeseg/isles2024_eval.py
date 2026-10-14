@@ -22,7 +22,6 @@ from pathlib import Path
 
 import numpy as np
 
-
 OFFICIAL_EVAL_SOURCE = (
     "https://github.com/ezequieldlrosa/isles24/blob/"
     "6b4dea6f07bf1717cca638ea1fe9345a47c3cd41/utils/eval_utils.py"
