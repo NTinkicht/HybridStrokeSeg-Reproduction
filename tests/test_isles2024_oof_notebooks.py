@@ -28,7 +28,7 @@ def test_cpu_recovery_notebooks_are_valid_and_dont_install_editable_extras(name)
             ast.parse("".join(cell["source"]))
     assert "ncct_oof_progress.json" in code
     assert "ncct_oof_resumable.log" in code
-    assert "panoptica==0.5.22" in code
+    assert "panoptica==1.4.1" in code
     assert "run_logged" in code
     assert "pip install -e" not in code
     assert '".[evaluation]"' not in code
