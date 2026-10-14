@@ -188,11 +188,15 @@ def official_dice_f1_and_lesion_difference(
             matching_threshold=PANOPTICA_MATCHING_THRESHOLD
         ),
     )
-    result, _ = evaluator.evaluate(
+    result_payload = evaluator.evaluate(
         prediction_int,
         reference_int,
         verbose=False,
     )["ungrouped"]
+    # The organizer's Panoptica API returned (result, diagnostics); the
+    # compatible 1.x release returns the result object directly. Neither
+    # variant changes the metrics or matching threshold.
+    result = result_payload[0] if isinstance(result_payload, tuple) else result_payload
 
     reference_count = int(result.num_ref_instances)
     prediction_count = int(result.num_pred_instances)

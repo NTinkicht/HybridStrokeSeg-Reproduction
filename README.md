@@ -58,6 +58,10 @@ ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **lo
 
 [![Evaluate ISLES'24 NCCT OOF results in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/12_isles2024_NCCT_OOF_EVALUATION.ipynb)
 
+[![Resumable ISLES'24 OOF CPU evaluation with progress](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/15_isles2024_NCCT_OOF_RESUMABLE_CPU.ipynb)
+
+**Recommended OOF evaluation:** Notebook 15 (or the repaired Notebook 12) uses CPU only, installs a narrow wheel-only metric environment instead of the broad project extras, and saves per-case checkpoints under the private Drive `results/ncct_oof_evaluation/case_checkpoints/`. Every case prints progress and writes `ncct_oof_progress.json`; full setup and evaluation output goes to `ncct_oof_resumable.log`. Restarts reuse checkpoints when original image sizes/timestamps remain unchanged. No retraining and no patient-level GitHub artifacts.
+
 [![Prepare ISLES'24 NCCT + perfusion ablation in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/13_isles2024_NCCT_PERFUSION_PREP.ipynb)
 
 [![Train ISLES'24 NCCT + perfusion folds in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/14_isles2024_NCCT_PERFUSION_NNUNET_CV.ipynb)
