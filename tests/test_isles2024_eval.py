@@ -75,7 +75,7 @@ def test_validate_oof_splits_rejects_duplicate_training_subject():
         validate_oof_splits(splits, {"a", "b"})
 
 
-def test_load_binary_mask_decodes_nonzero_voxels_without_float64_cache():
+def test_load_binary_mask_decodes_positive_voxels_without_float64_cache():
     image = SimpleNamespace(dataobj=np.array([[[0, 1], [-2, 0]]], dtype=np.int16))
     mask = load_binary_mask(image)
     assert mask.dtype == np.bool_
