@@ -61,7 +61,7 @@ def load_case(path: Path, signature: dict) -> dict | None:
         return None
     row = payload.get("metrics")
     if not isinstance(row, dict):
-        raise ValueError(f"Invalid case checkpoint (metrics missing): {path}")
+        raise TypeError(f"Invalid case checkpoint (metrics missing): {path}")
     if row.get("case_id") != signature["case_id"] or row.get("fold") != signature["fold"]:
         raise ValueError(f"Case checkpoint identity mismatch: {path}")
     return row
