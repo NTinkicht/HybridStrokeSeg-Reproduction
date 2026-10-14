@@ -155,7 +155,7 @@ def main() -> int:
     reference_root = preprocessed_dataset / "gt_segmentations"
 
     splits = load_splits(split_path)
-    expected_cases = set(case for split in splits for case in split["train"])
+    expected_cases = {case for split in splits for case in split["train"]}
     expected_cases.update(case for split in splits for case in split["val"])
     oof_cases = validate_oof_splits(splits, expected_cases)
     if len(oof_cases) != 149:
