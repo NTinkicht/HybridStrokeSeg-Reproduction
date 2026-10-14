@@ -16,9 +16,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
 import numpy as np
 
@@ -62,7 +62,7 @@ def load_splits(path: Path) -> list[dict[str, list[str]]]:
     normalized: list[dict[str, list[str]]] = []
     for index, split in enumerate(payload):
         if not isinstance(split, dict):
-            raise ValueError(f"Split {index} is not an object")
+            raise TypeError(f"Split {index} is not an object")
         train = [str(case) for case in split.get("train", [])]
         val = [str(case) for case in split.get("val", [])]
         if not val:
@@ -83,7 +83,7 @@ def validate_oof_splits(
         )
         raise ValueError(f"Validation cases are duplicated across folds: {duplicates}")
 
-    train_cases = set(case for split in splits for case in split["train"])
+    train_cases = {case for split in splits for case in split["train"]}
     if expected_cases is None:
         expected = train_cases | unique
     else:
