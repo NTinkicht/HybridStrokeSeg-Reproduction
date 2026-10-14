@@ -248,6 +248,44 @@ interrupted folds from nnU-Net checkpoints. Persistent outputs are written to:
 - `ISLES2024/results/nnunet_ncct_cv.log`
 - `ISLES2024/results/nnunet_ncct_cv_status.json`
 
-After all five folds complete, the next step is out-of-fold evaluation using
-the official ISLES'24 metric family: Dice, absolute volume difference,
-absolute lesion-count difference, and lesion-wise F1.
+All five Dataset504 folds are now complete. The CPU-only OOF evaluation workflow is:
+
+`notebooks/12_isles2024_NCCT_OOF_EVALUATION.ipynb`
+
+It verifies exactly 149 unique held-out predictions, computes the public
+ISLES'24 metric family, records fold-wise and aggregate statistics with
+bootstrap confidence intervals, and writes patient-level outputs to persistent
+Drive storage. The public challenge notebook states that official challenge
+evaluation additionally applies an NCCT-derived brain mask; unless an
+organizer-compatible mask is supplied, local OOF outputs are explicitly
+labelled as public-metric-implementation results without that masking step.
+
+## Dataset505: controlled perfusion ablation
+
+The next predeclared experiment adds the four registered perfusion maps while
+keeping every other design choice fixed:
+
+- channel 0: NCCT;
+- channel 1: Tmax;
+- channel 2: CBF;
+- channel 3: CBV;
+- channel 4: MTT.
+
+CTA is deliberately excluded from Dataset505 so its incremental contribution
+can be tested separately later. Dataset505 must contain the same 149 subjects
+and use fold assignments exactly identical to Dataset504. The repository now
+enforces that requirement with `scripts/verify_nnunet_splits.py`.
+
+CPU-only preparation:
+
+`notebooks/13_isles2024_NCCT_PERFUSION_PREP.ipynb`
+
+GPU training:
+
+`notebooks/14_isles2024_NCCT_PERFUSION_NNUNET_CV.ipynb`
+
+The training notebook is quota-aware: each Run all selects only the next
+unfinished fold, uses the pinned nnU-Net v2.8.1 configuration, caches
+preprocessed tensors on local SSD, and resumes interrupted training from the
+latest persistent checkpoint. This keeps the comparison paired and prevents a
+single Colab session from unexpectedly consuming several folds of GPU quota.
