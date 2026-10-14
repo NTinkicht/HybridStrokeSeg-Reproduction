@@ -1,0 +1,46 @@
+{
+  "strategy": "ISLES'24 controlled perfusion ablation",
+  "dataset_id": 505,
+  "dataset_name": "ISLES2024_NCCT_PERFUSION",
+  "task": "predict final post-treatment infarct from pre-interventional acute imaging",
+  "channels": [
+    "ncct",
+    "tmax",
+    "cbf",
+    "cbv",
+    "mtt"
+  ],
+  "forbidden_inputs": [
+    "CTA in this ablation",
+    "follow-up DWI",
+    "follow-up ADC",
+    "final infarct mask",
+    "post-treatment variables",
+    "3-month outcomes"
+  ],
+  "model": "nnU-Net v2.8.1",
+  "configuration": "3d_fullres",
+  "folds": 5,
+  "split_seed": 2026,
+  "split_reference_dataset": "Dataset504_ISLES2024_NCCT",
+  "require_exact_split_identity": true,
+  "training_policy": "one unfinished fold per Colab session; resume with --c",
+  "primary_metrics": [
+    "Dice",
+    "absolute volume difference",
+    "absolute lesion-count difference",
+    "lesion-wise F1"
+  ],
+  "comparison": "paired incremental value of registered perfusion maps over the frozen NCCT-only baseline",
+  "next_ablations": [
+    "NCCT + CTA + Tmax + CBF + CBV + MTT",
+    "imaging + baseline clinical fusion"
+  ],
+  "notes": [
+    "Audit all 149 public cases before staging.",
+    "Every registered perfusion map must pass the NCCT-grid geometry gate.",
+    "Dataset505 folds must match Dataset504 exactly before preprocessing or training.",
+    "CTA and baseline clinical files may be extracted for later experiments but are not Dataset505 inputs.",
+    "Follow-up MRI and outcome variables remain excluded by the temporal anti-leakage boundary."
+  ]
+}
