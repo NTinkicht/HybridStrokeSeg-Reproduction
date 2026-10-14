@@ -24,13 +24,6 @@ from pathlib import Path
 
 import numpy as np
 
-from hybridstrokeseg.isles2024_oof_progress import (
-    input_signature,
-    load_case,
-    record_progress,
-    save_case,
-)
-
 from hybridstrokeseg.isles2024_eval import (
     OFFICIAL_EVAL_SOURCE,
     bootstrap_mean_ci,
@@ -40,6 +33,14 @@ from hybridstrokeseg.isles2024_eval import (
     sha256_file,
     validate_oof_splits,
 )
+
+from hybridstrokeseg.isles2024_oof_progress import (
+    input_signature,
+    load_case,
+    record_progress,
+    save_case,
+)
+
 
 METRIC_FIELDS = (
     "dice",
