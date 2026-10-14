@@ -56,6 +56,8 @@ ISLES'24 changes the problem from same-timepoint MRI lesion segmentation to **lo
 
 [![Train ISLES'24 NCCT nnU-Net five-fold CV in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/11_isles2024_NCCT_NNUNET_CV.ipynb)
 
+[![Evaluate ISLES'24 NCCT OOF results in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/NTinkicht/HybridStrokeSeg-Reproduction/blob/main/notebooks/12_isles2024_NCCT_OOF_EVALUATION.ipynb)
+
 The training notebook uses persistent Drive paths for `nnUNet_preprocessed` and `nnUNet_results`, installs the pinned `nnunetv2==2.8.1` baseline, plans/preprocesses `3d_fullres` once, restores the deterministic project folds, and trains folds 0–4 with checkpoint resume and `--npz` validation outputs.
 
 After the 99 GB archive is complete, this notebook selectively extracts the core modeling subset, audits all 149 cases, and stages the first persistent NCCT-only nnU-Net v2 dataset on deterministic five-fold patient splits.
@@ -205,6 +207,10 @@ Train folds 0-4 with `--npz`; the exact protocol is recorded in `configs/isles20
 
 Patient data, medical images, model checkpoints and local experiment outputs are ignored by Git and must not be committed to this public repository.
 
-## Next milestone
+## Current ISLES'24 status and next milestone
 
-Audit the real ISLES'24 public training release, then stage a leakage-safe **NCCT-only nnU-Net v2 baseline** on deterministic patient-level folds. After that, add registered perfusion maps, CTA, and finally baseline clinical fusion as controlled ablations. ISLES 2022 remains an optional bridge experiment; the historical ISLES 2015 reproduction is frozen as a separate evidence track.
+The leakage-safe **NCCT-only nnU-Net v2 baseline is fully trained across all five deterministic folds** (149/149 unique OOF cases). The frozen nnU-Net validation summaries give an interim voxel-wise OOF Dice mean of **0.1738** (10,000-case-bootstrap 95% CI **0.1388-0.2115**), with substantial case heterogeneity. This snapshot is stored in `results/isles2024_ncct_oof_dice_snapshot.json`.
+
+The immediate next step is the CPU-only OOF evaluation notebook, which computes the four public ISLES'24 case-level metrics and writes the patient-level CSV and aggregate JSON to Drive. The public challenge materials state that official challenge evaluation additionally masks lesions using an NCCT-derived brain mask; because the organizer-compatible mask-generation step is not published in the public evaluator, our outputs remain explicitly labelled local OOF metrics unless compatible masks are supplied.
+
+After freezing the full NCCT evaluation, the next controlled ablation is **NCCT + Tmax + CBF + CBV + MTT** on exactly the same patient folds, followed by CTA and baseline-clinical fusion. ISLES 2022 remains an optional bridge experiment; the historical ISLES 2015 reproduction is frozen as a separate evidence track.

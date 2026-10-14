@@ -1,0 +1,37 @@
+{
+  "dataset": "Dataset504_ISLES2024_NCCT",
+  "configuration": "3d_fullres",
+  "status": "training_complete_interim_voxel_dice_snapshot",
+  "n_oof_cases": 149,
+  "unique_oof_cases": 149,
+  "fold_validation_counts": {
+    "0": 30,
+    "1": 30,
+    "2": 30,
+    "3": 30,
+    "4": 29
+  },
+  "dice": {
+    "mean": 0.17383454214057104,
+    "std": 0.22998663353927354,
+    "median": 0.05237938763199066,
+    "q1": 0.0,
+    "q3": 0.2889065851914451,
+    "min": 0.0,
+    "max": 0.774341575528264,
+    "zero_dice_cases": 55,
+    "cases_dice_ge_0_5": 20,
+    "bootstrap_mean_95ci": [
+      0.13875549593824768,
+      0.2114896181521384
+    ]
+  },
+  "fold_mean_dice": {
+    "0": 0.20355209507173283,
+    "1": 0.18947160369587737,
+    "2": 0.1443124783114881,
+    "3": 0.17129876446268277,
+    "4": 0.16007925974798776
+  },
+  "note": "Derived from nnU-Net validation summary.json files across the five deterministic OOF folds. Full four-metric ISLES'24 evaluation is produced by scripts/evaluate_isles2024_nnunet_oof.py."
+}
