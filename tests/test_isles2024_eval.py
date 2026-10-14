@@ -42,3 +42,31 @@ def test_bootstrap_mean_ci_is_deterministic():
     second = bootstrap_mean_ci(values, repetitions=500, seed=2026)
     assert first == second
     assert 0.0 <= first[0] <= first[1] <= 1.0
+
+
+def test_validate_oof_splits_rejects_patient_train_validation_leakage():
+    splits = [
+        {"train": ["a", "b"], "val": ["a"]},
+        {"train": ["a"], "val": ["b"]},
+    ]
+    with pytest.raises(ValueError, match="train/validation patient leakage"):
+        validate_oof_splits(splits, {"a", "b"})
+
+
+def test_validate_oof_splits_rejects_incomplete_training_partition():
+    splits = [
+        {"train": ["b"], "val": ["a"]},
+        {"train": ["a", "c"], "val": ["b"]},
+        {"train": ["a", "b"], "val": ["c"]},
+    ]
+    with pytest.raises(ValueError, match="training partition is incomplete"):
+        validate_oof_splits(splits, {"a", "b", "c"})
+
+
+def test_validate_oof_splits_rejects_duplicate_training_subject():
+    splits = [
+        {"train": ["b", "b"], "val": ["a"]},
+        {"train": ["a"], "val": ["b"]},
+    ]
+    with pytest.raises(ValueError, match="duplicate training case IDs"):
+        validate_oof_splits(splits, {"a", "b"})
