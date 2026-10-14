@@ -24,6 +24,13 @@ from pathlib import Path
 
 import numpy as np
 
+from hybridstrokeseg.isles2024_oof_progress import (
+    input_signature,
+    load_case,
+    record_progress,
+    save_case,
+)
+
 from hybridstrokeseg.isles2024_eval import (
     OFFICIAL_EVAL_SOURCE,
     bootstrap_mean_ci,
@@ -169,6 +176,12 @@ def main() -> int:
     checkpoint_manifest: dict[str, dict] = {}
     nnunet_dice_deltas: list[float] = []
 
+    progress_path = args.output_dir / "ncct_oof_progress.json"
+    checkpoint_root = args.output_dir / "case_checkpoints"
+    record_progress(
+        progress_path, completed=0, total=len(oof_cases), fold=None,
+        case_id=None, status="running", detail="Cohort preflight passed",
+    )
     print("OOF preflight passed; beginning 5 folds", flush=True)
     for fold, split in enumerate(splits):
         print(f"Evaluating fold {fold}, {len(split['val'])} cases", flush=True)
@@ -203,52 +216,82 @@ def main() -> int:
             )
 
         for case_id in expected_val:
-            print(f"  Evaluating {case_id}", flush=True)
             prediction_path = validation_dir / f"{case_id}.nii.gz"
             reference_path = reference_root / f"{case_id}.nii.gz"
-            if not reference_path.is_file():
-                raise FileNotFoundError(reference_path)
+            cache_path = checkpoint_root / f"{case_id}.json"
+            try:
+                brain_mask_path = find_brain_mask(args.brain_mask_root, case_id)
+                signature = input_signature(
+                    case_id, fold, reference_path, prediction_path, brain_mask_path
+                )
+                row = load_case(cache_path, signature)
+                reused = row is not None
+                if row is None:
+                    reference_img = load_nifti(reference_path)
+                    prediction_img = load_nifti(prediction_path)
+                    assert_geometry(reference_img, prediction_img, case_id=case_id)
 
-            reference_img = load_nifti(reference_path)
-            prediction_img = load_nifti(prediction_path)
-            assert_geometry(reference_img, prediction_img, case_id=case_id)
+                    reference = load_binary_mask(reference_img)
+                    prediction = load_binary_mask(prediction_img)
+                    zooms = reference_img.header.get_zooms()[:3]
+                    voxel_volume_ml = float(np.prod(np.asarray(zooms, dtype=float)) / 1000.0)
 
-            reference = load_binary_mask(reference_img)
-            prediction = load_binary_mask(prediction_img)
-            zooms = reference_img.header.get_zooms()[:3]
-            voxel_volume_ml = float(np.prod(np.asarray(zooms, dtype=float)) / 1000.0)
+                    brain_mask = None
+                    if brain_mask_path is not None:
+                        brain_img = load_nifti(brain_mask_path)
+                        assert_geometry(
+                            reference_img, brain_img, case_id=f"{case_id}/brain-mask"
+                        )
+                        brain_mask = load_binary_mask(brain_img)
 
-            brain_mask_path = find_brain_mask(args.brain_mask_root, case_id)
-            brain_mask = None
-            if brain_mask_path is not None:
-                brain_img = load_nifti(brain_mask_path)
-                assert_geometry(reference_img, brain_img, case_id=f"{case_id}/brain-mask")
-                brain_mask = load_binary_mask(brain_img)
-
-            metrics = evaluate_case(
-                case_id=case_id,
-                fold=fold,
-                reference=reference,
-                prediction=prediction,
-                voxel_volume_ml=voxel_volume_ml,
-                brain_mask=brain_mask,
-            )
-            row = asdict(metrics)
-            row["voxel_volume_ml"] = voxel_volume_ml
-            row["prediction_path"] = str(prediction_path)
-            row["reference_path"] = str(reference_path)
-            row["brain_mask_path"] = str(brain_mask_path) if brain_mask_path else ""
-            rows.append(row)
-
-            if case_id in nnunet_case_dice:
-                delta = abs(metrics.dice - nnunet_case_dice[case_id])
-                nnunet_dice_deltas.append(delta)
-                if delta > 1e-6:
-                    raise RuntimeError(
-                        f"{case_id}: official/public evaluator Dice {metrics.dice} "
-                        f"does not match nnU-Net summary Dice {nnunet_case_dice[case_id]} "
-                        f"(delta={delta})"
+                    metrics = evaluate_case(
+                        case_id=case_id,
+                        fold=fold,
+                        reference=reference,
+                        prediction=prediction,
+                        voxel_volume_ml=voxel_volume_ml,
+                        brain_mask=brain_mask,
                     )
+                    row = asdict(metrics)
+                    row["voxel_volume_ml"] = voxel_volume_ml
+                    row["prediction_path"] = str(prediction_path)
+                    row["reference_path"] = str(reference_path)
+                    row["brain_mask_path"] = str(brain_mask_path) if brain_mask_path else ""
+
+                if case_id in nnunet_case_dice:
+                    delta = abs(float(row["dice"]) - nnunet_case_dice[case_id])
+                    nnunet_dice_deltas.append(delta)
+                    if delta > 1e-6:
+                        raise RuntimeError(
+                            f"{case_id}: public evaluator Dice {row['dice']} "
+                            f"does not match nnU-Net Dice {nnunet_case_dice[case_id]} "
+                            f"(delta={delta})"
+                        )
+                if not reused:
+                    save_case(cache_path, signature, row)
+
+                rows.append(row)
+                done = len(rows)
+                percent = 100.0 * done / len(oof_cases)
+                record_progress(
+                    progress_path, completed=done, total=len(oof_cases), fold=fold,
+                    case_id=case_id, status="running",
+                    detail="resumed" if reused else "computed",
+                )
+                print(
+                    f"[{done:03d}/{len(oof_cases)}] {percent:5.1f}% "
+                    f"fold={fold} case={case_id} "
+                    f"{'RESUMED' if reused else 'COMPUTED'} "
+                    f"Dice={float(row['dice']):.4f}",
+                    flush=True,
+                )
+            except Exception as exc:
+                record_progress(
+                    progress_path, completed=len(rows), total=len(oof_cases),
+                    fold=fold, case_id=case_id, status="failed",
+                    detail=f"{type(exc).__name__}: {exc}",
+                )
+                raise
 
     case_ids = [row["case_id"] for row in rows]
     if len(rows) != 149 or len(set(case_ids)) != 149:
@@ -357,6 +400,10 @@ def main() -> int:
             "NOTE: organizer NCCT-derived brain masking was not applied; "
             "do not label these as exact hidden-test challenge metrics."
         )
+    record_progress(
+        progress_path, completed=len(rows), total=len(oof_cases), fold=None,
+        case_id=None, status="complete", detail="All output files written",
+    )
     return 0
 
 
