@@ -40,7 +40,6 @@ from hybridstrokeseg.isles2024_oof_progress import (
     save_case,
 )
 
-
 METRIC_FIELDS = (
     "dice",
     "absolute_volume_difference_ml",
