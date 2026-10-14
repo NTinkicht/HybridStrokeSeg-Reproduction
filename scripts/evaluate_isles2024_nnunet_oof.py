@@ -28,6 +28,7 @@ from hybridstrokeseg.isles2024_eval import (
     OFFICIAL_EVAL_SOURCE,
     bootstrap_mean_ci,
     evaluate_case,
+    load_binary_mask,
     load_splits,
     sha256_file,
     validate_oof_splits,
@@ -168,7 +169,9 @@ def main() -> int:
     checkpoint_manifest: dict[str, dict] = {}
     nnunet_dice_deltas: list[float] = []
 
+    print("OOF preflight passed; beginning 5 folds", flush=True)
     for fold, split in enumerate(splits):
+        print(f"Evaluating fold {fold}, {len(split['val'])} cases", flush=True)
         fold_dir = run_dir / f"fold_{fold}"
         checkpoint = fold_dir / "checkpoint_final.pth"
         validation_dir = fold_dir / "validation"
@@ -200,6 +203,7 @@ def main() -> int:
             )
 
         for case_id in expected_val:
+            print(f"  Evaluating {case_id}", flush=True)
             prediction_path = validation_dir / f"{case_id}.nii.gz"
             reference_path = reference_root / f"{case_id}.nii.gz"
             if not reference_path.is_file():
@@ -209,8 +213,8 @@ def main() -> int:
             prediction_img = load_nifti(prediction_path)
             assert_geometry(reference_img, prediction_img, case_id=case_id)
 
-            reference = np.asarray(reference_img.get_fdata()) > 0
-            prediction = np.asarray(prediction_img.get_fdata()) > 0
+            reference = load_binary_mask(reference_img)
+            prediction = load_binary_mask(prediction_img)
             zooms = reference_img.header.get_zooms()[:3]
             voxel_volume_ml = float(np.prod(np.asarray(zooms, dtype=float)) / 1000.0)
 
@@ -219,7 +223,7 @@ def main() -> int:
             if brain_mask_path is not None:
                 brain_img = load_nifti(brain_mask_path)
                 assert_geometry(reference_img, brain_img, case_id=f"{case_id}/brain-mask")
-                brain_mask = np.asarray(brain_img.get_fdata()) > 0
+                brain_mask = load_binary_mask(brain_img)
 
             metrics = evaluate_case(
                 case_id=case_id,

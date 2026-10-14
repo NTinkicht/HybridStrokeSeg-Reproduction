@@ -120,6 +120,15 @@ def validate_oof_splits(
     return sorted(unique)
 
 
+def load_binary_mask(image) -> np.ndarray:
+    """Decode a NIfTI proxy directly to bool without a float64 get_fdata cache.
+
+    nibabel proxies apply any on-disk scaling during np.asanyarray, so the
+    foreground definition remains exactly the original strictly-positive threshold.
+    """
+    return np.asanyarray(image.dataobj) > 0
+
+
 def absolute_volume_difference_ml(
     reference: np.ndarray,
     prediction: np.ndarray,
