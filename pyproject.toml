@@ -27,6 +27,12 @@ notebook = [
 modern = [
   "nnunetv2==2.8.1",
 ]
+evaluation = [
+  "nibabel>=5.2,<6",
+  "pandas>=2.2,<3",
+  "panoptica>=0.5,<1",
+  "connected-components-3d>=3.12,<4",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
