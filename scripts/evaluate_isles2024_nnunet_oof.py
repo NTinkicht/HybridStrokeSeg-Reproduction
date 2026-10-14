@@ -33,7 +33,6 @@ from hybridstrokeseg.isles2024_eval import (
     validate_oof_splits,
 )
 
-
 METRIC_FIELDS = (
     "dice",
     "absolute_volume_difference_ml",
