@@ -54,3 +54,8 @@ jobs:
           assert abs(out.lesion_f1 - 1.0) < 1e-8, out
           print(out)
           PY
+
+      - name: Verify WU20 NIfTI transform geometry in runtime
+        env:
+          PYTHONPATH: src
+        run: python tests/smoke_wu20_nifti.py
