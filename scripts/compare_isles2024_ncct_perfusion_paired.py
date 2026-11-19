@@ -294,9 +294,9 @@ def main() -> None:
         )
     lines.extend([
         "",
-        "The reported paired patient bootstrap and sign-flip tests assume patient-level independence. "
+        ("The reported paired patient bootstrap and sign-flip tests assume patient-level independence. "
         "Shared fold models and overlapping cross-validation training sets limit formal inference. "
-        "The following analyses are *descriptive sensitivity checks*, not independent external validation.",
+        "The following analyses are *descriptive sensitivity checks*, not independent external validation."),
         "",
         "## Leave-one-fold-out sensitivity",
         "",
@@ -344,8 +344,8 @@ def main() -> None:
         "- Dice and lesion-F1 higher is better; absolute lesion volume/count errors lower is better.",
         "- No organizer-compatible NCCT-derived brain mask was applied; these are local OOF metrics.",
         "- Patient scores are heterogeneous: mean gains do not imply a consistent individual benefit.",
-        "- The current Dataset505 MTT fingerprint has an extreme negative outlier; this requires "
-        "per-patient raw image analysis before claiming modality-specific improvement.",
+        ("- The current Dataset505 MTT fingerprint has an extreme negative outlier; this requires "
+        "per-patient raw image analysis before claiming modality-specific improvement."),
         "- Both arms use nnU-Net ZScoreNormalization for the NCCT channel, not CTNormalization.",
         "- A clean separate preprocessing-controlled ablation is needed; retain Dataset504/505 unchanged.",
         "",
