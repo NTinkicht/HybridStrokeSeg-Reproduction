@@ -62,7 +62,7 @@ def test_audit_requires_full_five_channel_inventory(tmp_path):
         writer.writeheader()
         for case in sorted(cases):
             for ch in D['CHANNELS']:
-                writer.writerow(dict(case_id=case,channel=ch,n_nonfinite=0,count_below_minus_10000=0,min=0,max=1))
+                writer.writerow({"case_id":case,"channel":ch,"n_nonfinite":0,"count_below_minus_10000":0,"min":0,"max":1})
     result=D['audited_csv'](p,D['RAW_FIELDS']|{'case_id','channel'},cases)
     assert len(result)==745
     with p.open('a') as fp: fp.write('sub_stroke0001,MTT,0,0,0,1\n')
