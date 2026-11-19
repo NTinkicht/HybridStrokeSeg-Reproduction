@@ -8,8 +8,9 @@ from pathlib import Path
 import nibabel as nib
 import numpy as np
 
-from hybridstrokeseg.wu20_fold_preprocessing import candidate_arms
 from stage_isles2024_fold_pilot import _save_preprocessed
+
+from hybridstrokeseg.wu20_fold_preprocessing import candidate_arms
 
 
 def main() -> None:
