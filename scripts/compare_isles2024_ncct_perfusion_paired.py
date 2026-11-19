@@ -103,9 +103,13 @@ def validate_pairs(baseline: dict[str, dict], perfusion: dict[str, dict], *, ful
         for attr, atol in (("reference_volume_ml", 1e-5), ("voxel_volume_ml", 1e-9)):
             if not np.isclose(float(a[attr]), float(b[attr]), atol=atol, rtol=1e-6):
                 raise ValueError(f"{case_id}: {attr} is different across modalities")
-        if full and "reference_lesion_count" in a and "reference_lesion_count" in b:
-            if int(a["reference_lesion_count"]) != int(b["reference_lesion_count"]):
-                raise ValueError(f"{case_id}: reference connected-component count differs")
+        if (
+            full
+            and "reference_lesion_count" in a
+            and "reference_lesion_count" in b
+            and int(a["reference_lesion_count"]) != int(b["reference_lesion_count"])
+        ):
+            raise ValueError(f"{case_id}: reference connected-component count differs")
         row = {"case_id": case_id, "fold": int(a["fold"]), "reference_volume_ml": float(a["reference_volume_ml"])}
         for key, _, _ in METRICS[:4 if full else 2]:
             if key not in b:
