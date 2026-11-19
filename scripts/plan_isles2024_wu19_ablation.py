@@ -9,6 +9,7 @@ IMPORTANT: This does NOT generate fold-calibrated training images. WU-20 must
 implement label-free spatial support, train-only statistics, fold-specific
 preprocessing AND matching inference before any GPU training can be authorized.
 """
+
 from __future__ import annotations
 
 import argparse
