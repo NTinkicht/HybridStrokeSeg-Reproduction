@@ -100,7 +100,7 @@ def patch_fake_inputs(monkeypatch, tmp_path, *, fail_one=False):
 
 
 def test_all_five_folds_use_exact_119_or_120_train_cases(monkeypatch, tmp_path):
-    paths, ids, folds = patch_fake_inputs(monkeypatch, tmp_path)
+    paths, _ids, folds = patch_fake_inputs(monkeypatch, tmp_path)
     result = AUDIT["full_calibration"](*paths, render_overlays=False)
     assert result["status"] == "FULL_FOLD_PROVISIONAL_FIT_COMPLETE"
     assert result["training_ready"] is False
@@ -115,7 +115,7 @@ def test_all_five_folds_use_exact_119_or_120_train_cases(monkeypatch, tmp_path):
         assert output["training_ready"] is False
         assert set(output["source_sample_sha256"]) == set(train)
         assert set(output["source_sample_sha256"]).isdisjoint(val)
-        for ch, params in output["provisional_fit"].items():
+        for params in output["provisional_fit"].values():
             assert set(params["training_ids"]) == set(train)
             assert set(params["validation_ids_excluded"]) == set(val)
             assert params["n_training_cases"] == len(train)
@@ -125,7 +125,7 @@ def test_all_five_folds_use_exact_119_or_120_train_cases(monkeypatch, tmp_path):
 
 
 def test_bad_source_blocks_all_fold_manifests(monkeypatch, tmp_path):
-    paths, ids, _ = patch_fake_inputs(monkeypatch, tmp_path, fail_one=True)
+    paths, _ids, _ = patch_fake_inputs(monkeypatch, tmp_path, fail_one=True)
     result = AUDIT["full_calibration"](*paths, render_overlays=False)
     assert result["status"] == "PARTIAL_OR_FAILED"
     assert result["completed_verified"] == 148
