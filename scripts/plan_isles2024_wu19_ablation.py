@@ -20,7 +20,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-
 FROZEN_SPLIT_SHA = "664ed51e15374f8f9568d586fba2cb87d5157dc90986e5eca82c9c8440bf6027"
 FOLD_SIZES = (30, 30, 30, 30, 29)
 CHANNELS = ("NCCT", "TMAX", "CBF", "CBV", "MTT")
