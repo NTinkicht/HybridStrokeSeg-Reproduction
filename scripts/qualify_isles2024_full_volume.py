@@ -18,14 +18,22 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
+from qualify_isles2024_nnunet_runtime import (
+    PINNED_NNUNET,
+    SOURCE_PLANS_SHA,
+    build_locked_plans,
+    check_actual_nnunet_normalization,
+    validate_locked_fold_manifest,
+)
+from stage_isles2024_fold_pilot import _save_preprocessed
 
 from hybridstrokeseg.wu20_fold_preprocessing import (
-    CHANNELS, candidate_arms, file_sha256, ncct_head_tissue_support,
-    no_norm_dataset_json, validated_split,
-)
-from qualify_isles2024_nnunet_runtime import (
-    PINNED_NNUNET, SOURCE_PLANS_SHA, build_locked_plans,
-    check_actual_nnunet_normalization, validate_locked_fold_manifest,
+    CHANNELS,
+    candidate_arms,
+    file_sha256,
+    ncct_head_tissue_support,
+    no_norm_dataset_json,
+    validated_split,
 )
 
 SCHEMA = "WU20D-full-native-volume-1.0"
@@ -182,10 +190,7 @@ def run_full_case(raw: Path, splits: Path, plans_path: Path, manifest_path: Path
     gc.collect()
     with tempfile.TemporaryDirectory(prefix="wu20d_full_volume_") as scratch:
         home = Path(scratch)
-        saved = {}
         for dataset, channel_data in ((506, arm506), (507, arm507)):
-            from hybridstrokeseg.wu20_fold_preprocessing import file_sha256 as _file_sha256
-            from stage_isles2024_fold_pilot import _save_preprocessed
             d = home / f"Dataset{dataset}"
             (d / "imagesTs").mkdir(parents=True)
             paths = []
@@ -198,8 +203,8 @@ def run_full_case(raw: Path, splits: Path, plans_path: Path, manifest_path: Path
                     _save_preprocessed(dest, channel_data[ch], imgs[CHANNELS.index(ch)])
                 paths.append(dest)
             if dataset == 506:
-                ncct_file_hash = _file_sha256(paths[0])
-            elif _file_sha256(paths[0]) != ncct_file_hash:
+                ncct_file_hash = file_sha256(paths[0])
+            elif file_sha256(paths[0]) != ncct_file_hash:
                 raise ValueError("Dataset506/507 NCCT staging not byte-identical")
             del channel_data
             gc.collect()
