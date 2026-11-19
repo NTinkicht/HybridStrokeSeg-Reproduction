@@ -81,7 +81,7 @@ def summarize_pixels(array: np.ndarray) -> dict:
         "count_below_minus_1000": below1k,
         "count_below_minus_10000": below10k,
         "count_above_plus_10000": above10k,
-        "sample_n": int(len(sample)),
+        "sample_n": len(sample),
         "q001": float(q[0]),
         "q005": float(q[1]),
         "median": float(q[2]),
