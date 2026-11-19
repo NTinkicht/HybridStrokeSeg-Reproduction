@@ -255,7 +255,11 @@ def full_calibration(raw: Path, splits: Path, plans: Path, output: Path,
         raise ValueError("Negative case limit")
     source = validate_source(raw, plans)
     cases, folds = get_split_fold_cases(splits)
-    if any(p == output or p in output.parents for p in (raw, raw.parent, plans.parent)):
+    protected = [raw.resolve(), raw.parent.resolve()]
+    if plans.parent.name.startswith("Dataset505_"):
+        protected.append(plans.parent.resolve())
+    target = output.resolve()
+    if any(p == target or p in target.parents for p in protected):
         raise ValueError("Output must not be inside frozen source folder")
     if output.is_symlink():
         raise ValueError("Refuse symlink output")
