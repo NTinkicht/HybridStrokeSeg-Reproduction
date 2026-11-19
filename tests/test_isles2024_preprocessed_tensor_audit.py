@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import csv
 import hashlib
 import json
@@ -117,3 +118,24 @@ def test_149_case_resumable_output_and_raw_comparison(tmp_path, monkeypatch):
     (config / f"{cases[0]}.b2nd").write_bytes(b"synthetic new input")
     AUDIT["run"](dataset, split_file, raw, out, block=2)
     assert calls[-1] == cases[0] and len(calls) == 150
+
+
+def test_notebook_18_uses_pinned_cpu_read_only_audit():
+    notebook_path = (
+        Path(__file__).resolve().parents[1]
+        / "notebooks"
+        / "18_ISLES2024_PREPROCESSED_TENSOR_AUDIT.ipynb"
+    )
+    notebook = json.loads(notebook_path.read_text(encoding="utf8"))
+    assert notebook["nbformat"] == 4
+    code = ""
+    for cell in notebook["cells"]:
+        if cell["cell_type"] == "code":
+            source = "".join(cell["source"])
+            ast.parse(source)
+            code += source + "\n"
+    assert "EXPECTED_SCRIPT_SHA256" in code
+    assert "perfusion_preprocessed_tensor_audit" in code
+    assert "blosc2>=4.0,<5" in code
+    assert "nnUNetv2_train" not in code
+    assert "Runtime" in "".join(notebook["cells"][0]["source"])
