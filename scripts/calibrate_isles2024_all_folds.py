@@ -9,7 +9,6 @@ All patient-derived checkpoints, samples, and PNGs MUST stay in private Drive.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 from datetime import datetime, timezone
@@ -198,7 +197,7 @@ def generate_overlay(raw: Path, case: str, destination: Path) -> None:
     mask, _ = ncct_head_tissue_support(pixels)
     where = np.where(mask)
     z0, z1 = int(where[2].min()), int(where[2].max())
-    slices = sorted({int(round(z0 + frac * (z1 - z0))) for frac in (0.2, 0.5, 0.8)})
+    slices = sorted({round(z0 + frac * (z1 - z0)) for frac in (0.2, 0.5, 0.8)})
     fig, axs = plt.subplots(2, len(slices), figsize=(4 * len(slices), 8), squeeze=False)
     for j, k in enumerate(slices):
         original = np.rot90(pixels[:, :, k])
