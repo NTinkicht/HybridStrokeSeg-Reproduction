@@ -30,7 +30,6 @@ METRICS = (
     ("lesion_f1", "Lesion-wise F1", "higher"),
     ("absolute_lesion_count_difference", "Absolute lesion-count difference", "lower"),
 )
-PERF_FIELDS = ("dice", "absolute_volume_difference_ml", "lesion_f1", "absolute_lesion_count_difference")
 REQUIRED = {"case_id", "fold", "dice", "absolute_volume_difference_ml", "reference_volume_ml", "voxel_volume_ml"}
 
 
@@ -181,7 +180,35 @@ def analyze(paired: list[dict], *, full: bool, n_boot: int, n_perm: int, seed: i
         delta = perf - base
         p = paired_permutation_p(delta, n_reps=n_perm, seed=seed+100+idx)
         pvals.append(p)
+        sample_std = float(np.std(delta, ddof=1))
+        effect_size = float(delta.mean() / sample_std) if sample_std > 0 else None
+        n_equal = int(np.count_nonzero(np.isclose(perf, base, rtol=0, atol=1e-12)))
+        quartile_bounds = np.quantile([r["reference_volume_ml"] for r in paired], [0.25, 0.5, 0.75])
+        labels = np.searchsorted(quartile_bounds, [r["reference_volume_ml"] for r in paired], side="left")
+        volume_quartiles = {}
+        for bin_id in range(4):
+            group = labels == bin_id
+            volume_quartiles[str(bin_id + 1)] = {
+                "n": int(group.sum()),
+                "mean_reference_volume_ml": float(np.mean([r["reference_volume_ml"] for i, r in enumerate(paired) if group[i]])),
+                "ncct_mean": float(base[group].mean()),
+                "perfusion_mean": float(perf[group].mean()),
+                "delta_mean": float(delta[group].mean()),
+            }
+        leave_one_fold_out = {
+            str(fold): {
+                "n": int(np.count_nonzero(np.asarray([r["fold"] != fold for r in paired]))),
+                "delta_mean": float(delta[np.asarray([r["fold"] != fold for r in paired])].mean()),
+            }
+            for fold in range(5)
+        }
         result["metrics"][key] = {
+            "delta_median": float(np.median(delta)),
+            "delta_q1": float(np.quantile(delta, 0.25)),
+            "delta_q3": float(np.quantile(delta, 0.75)),
+            "cohens_dz_paired": effect_size,
+            "volume_quartile_sensitivity": volume_quartiles,
+            "leave_one_fold_out_sensitivity": leave_one_fold_out,
             "name": human, "better": direction, "n": n,
             "ncct_mean": float(base.mean()), "perfusion_mean": float(perf.mean()),
             "perfusion_minus_ncct_mean": float(delta.mean()),
@@ -189,7 +216,7 @@ def analyze(paired: list[dict], *, full: bool, n_boot: int, n_perm: int, seed: i
             "two_sided_sign_flip_permutation_p_nominal": p,
             "n_improved": int(((perf > base) if direction == "higher" else (perf < base)).sum()),
             "n_worsened": int(((perf < base) if direction == "higher" else (perf > base)).sum()),
-            "n_unchanged": int((perf == base).sum()),
+            "n_unchanged": n_equal,
             "fold_means": {
                 str(f): {"n": sum(r["fold"]==f for r in paired),
                          "ncct": float(np.mean([r[f"ncct_{key}"] for r in paired if r["fold"] == f])),
@@ -243,19 +270,86 @@ def main() -> None:
         writer = csv.DictWriter(fp, fieldnames=list(paired[0]))
         writer.writeheader(); writer.writerows(paired)
     (args.output_dir / f"{pathbase}_summary.json").write_text(json.dumps(summary, indent=2) + "\n", encoding="utf8")
-    lines = ["# ISLES2024: paired Dataset504 vs Dataset505 evaluation", "", "**Scope:** matched, local five-fold out-of-fold validation (149 patients); not the official hidden-test challenge.", "", f"**Mode:** {'Four-metric mask-level evaluation' if full else 'Interim Dice and volume analysis'}.", "", "| Metric | NCCT | NCCT + perfusion | Δ (perfusion − NCCT) | 95% paired CI | Sign-flip p (nominal) |", "|---|---:|---:|---:|---|---:|"]
+    lines = [
+        "# ISLES2024: paired Dataset504 vs Dataset505 evaluation",
+        "",
+        "**Scope:** local five-fold OOF matched validation, 149 patients; not organizer hidden-test scores.",
+        "",
+        "**All four endpoints are exploratory unless their Holm-adjusted p-values survive 0.05.**",
+        "",
+        "| Metric | NCCT | NCCT + perfusion | Δ (perfusion − NCCT) | 95% paired CI | Nominal p | Holm-adjusted p (4 metrics) |",
+        "|---|---:|---:|---:|---|---:|---:|",
+    ]
     for k, _, _ in (METRICS if full else METRICS[:2]):
         x = summary["metrics"][k]
         ci = x["delta_95ci_paired_bootstrap"]
-        lines.append(f"| {x['name']} | {x['ncct_mean']:.5f} | {x['perfusion_mean']:.5f} | {x['perfusion_minus_ncct_mean']:+.5f} | [{ci[0]:+.5f}, {ci[1]:+.5f}] | {x['two_sided_sign_flip_permutation_p_nominal']:.5f} |")
-    lines.extend(["", "## Scientific interpretation", "",
-      "- **Study design:** identical patient-wise folds, no patient leakage; all 149 paired cases have identical ground-truth lesion volumes.",
-      "- **Directions:** Dice and lesion-F1 higher is better; absolute volume and lesion-count errors lower is better.",
-      "- **Uncertainty:** 95% paired patient bootstrap intervals, two-sided patient sign-flip permutation p-values.",
-      "- **Multiplicity:** " + ("Holm adjustment was computed across all four prespecified metrics; see JSON for adjusted p-values." if full else "Only two metrics are available. Significance is exploratory; the other two prespecified lesion metrics require mask-level Panoptica evaluation."),
-      "- **Masking:** organizer-specific NCCT-derived brain masks were not applied; these are local OOF metrics, not official ISLES challenge test scores.",
-      "- **Heterogeneity:** patient-level responses differ; an overall mean gain does not imply every patient benefits.",
-      ""])
+        adjusted = x.get("holm_adjusted_p_4_metrics")
+        adjusted_display = f"{adjusted:.5f}" if adjusted is not None else "Pending"
+        lines.append(
+            f"| {x['name']} | {x['ncct_mean']:.5f} | {x['perfusion_mean']:.5f} "
+            f"| {x['perfusion_minus_ncct_mean']:+.5f} "
+            f"| [{ci[0]:+.5f}, {ci[1]:+.5f}] "
+            f"| {x['two_sided_sign_flip_permutation_p_nominal']:.5f} "
+            f"| {adjusted_display} |"
+        )
+    lines.extend([
+        "",
+        "The reported paired patient bootstrap and sign-flip tests assume patient-level independence. "
+        "Shared fold models and overlapping cross-validation training sets limit formal inference. "
+        "The following analyses are *descriptive sensitivity checks*, not independent external validation.",
+        "",
+        "## Leave-one-fold-out sensitivity",
+        "",
+        "| Metric | Omitted fold | Remaining patients | Mean delta |",
+        "|---|---:|---:|---:|",
+    ])
+    for k, _, _ in (METRICS if full else METRICS[:2]):
+        m = summary["metrics"][k]
+        for fold, x in m["leave_one_fold_out_sensitivity"].items():
+            lines.append(f"| {m['name']} | {fold} | {x['n']} | {x['delta_mean']:+.5f} |")
+    lines.extend([
+        "",
+        "## Lesion reference volume quartiles (descriptive)",
+        "",
+        "| Metric | Reference volume quartile | Cases | Mean ref volume (mL) | Mean delta |",
+        "|---|---:|---:|---:|---:|",
+    ])
+    for k, _, _ in (METRICS if full else METRICS[:2]):
+        m = summary["metrics"][k]
+        for q, x in m["volume_quartile_sensitivity"].items():
+            lines.append(
+                f"| {m['name']} | Q{q} | {x['n']} "
+                f"| {x['mean_reference_volume_ml']:.3f} | {x['delta_mean']:+.5f} |"
+            )
+    lines.extend([
+        "",
+        "## Effect sizes and heterogeneity",
+        "",
+        "| Metric | Median delta | Q1 delta | Q3 delta | Paired Cohen dz |",
+        "|---|---:|---:|---:|---:|",
+    ])
+    for k, _, _ in (METRICS if full else METRICS[:2]):
+        x = summary["metrics"][k]
+        dz = x["cohens_dz_paired"]
+        lines.append(
+            f"| {x['name']} | {x['delta_median']:+.5f} | {x['delta_q1']:+.5f} "
+            f"| {x['delta_q3']:+.5f} | {dz:.4f} |" if dz is not None
+            else f"| {x['name']} | {x['delta_median']:+.5f} | {x['delta_q1']:+.5f} "
+                 f"| {x['delta_q3']:+.5f} | n/a |"
+        )
+    lines.extend([
+        "",
+        "## Scientific limitations",
+        "",
+        "- Dice and lesion-F1 higher is better; absolute lesion volume/count errors lower is better.",
+        "- No organizer-compatible NCCT-derived brain mask was applied; these are local OOF metrics.",
+        "- Patient scores are heterogeneous: mean gains do not imply a consistent individual benefit.",
+        "- The current Dataset505 MTT fingerprint has an extreme negative outlier; this requires "
+        "per-patient raw image analysis before claiming modality-specific improvement.",
+        "- Both arms use nnU-Net ZScoreNormalization for the NCCT channel, not CTNormalization.",
+        "- A clean separate preprocessing-controlled ablation is needed; retain Dataset504/505 unchanged.",
+        "",
+    ])
     (args.output_dir / f"{pathbase}_report.md").write_text("\n".join(lines), encoding="utf8")
     print("Verified", len(paired), "paired cases; all five frozen folds.")
     print("Mode:", summary["mode"])
