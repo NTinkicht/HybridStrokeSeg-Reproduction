@@ -59,3 +59,8 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tests/smoke_wu20_nifti.py
+
+      - name: Verify WU20C cropped NIfTI affine and qform/sform
+        env:
+          PYTHONPATH: src
+        run: python tests/smoke_wu20c_nifti.py
