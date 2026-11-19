@@ -6,8 +6,15 @@ import csv
 import json
 import sys
 from pathlib import Path
+from runpy import run_path
 
-from scripts.compare_isles2024_ncct_perfusion_paired import analyze, main
+# This repository packages its runtime code under src/, not scripts/.
+# Import the standalone analysis CLI by exact file path.
+_SCRIPT = run_path(
+    str(Path(__file__).resolve().parents[1] / "scripts" / "compare_isles2024_ncct_perfusion_paired.py")
+)
+analyze = _SCRIPT["analyze"]
+main = _SCRIPT["main"]
 
 
 def _rows():
