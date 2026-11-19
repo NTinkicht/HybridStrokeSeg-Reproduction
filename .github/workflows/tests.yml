@@ -64,3 +64,8 @@ jobs:
         env:
           PYTHONPATH: src
         run: python tests/smoke_wu20c_nifti.py
+
+      - name: Verify WU20D full-native-grid NIfTI safety
+        env:
+          PYTHONPATH: src:scripts
+        run: python tests/smoke_wu20d_full_native_io.py
