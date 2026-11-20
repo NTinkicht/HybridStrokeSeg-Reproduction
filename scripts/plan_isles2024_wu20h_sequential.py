@@ -12,6 +12,7 @@ import hashlib
 import json
 import os
 import shutil
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -40,14 +41,23 @@ def load_json(path: Path) -> dict:
 
 
 def atomic_json(path: Path, obj: dict) -> None:
+    """Use exclusive unpredictable temporary files; never follow an attacker symlink."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    temp = path.with_name(path.name + ".tmp")
-    with temp.open("w", encoding="utf-8") as fp:
-        json.dump(obj, fp, sort_keys=True, indent=2, allow_nan=False)
-        fp.write("\n")
-        fp.flush()
-        os.fsync(fp.fileno())
-    os.replace(temp, path)
+    if path.is_symlink():
+        raise ValueError("Refusing symlinked report destination")
+    fd, temporary = tempfile.mkstemp(
+        prefix=path.name + ".", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fp:
+            json.dump(obj, fp, sort_keys=True, indent=2, allow_nan=False)
+            fp.write("\n")
+            fp.flush()
+            os.fsync(fp.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
 
 
 def protect_outputs(output: Path, scratch: Path, evidence: list[Path]) -> None:
@@ -281,8 +291,10 @@ def create_plan(wu20g_plan: Path, wu20f_virtual: Path, wu20f_preflight: Path,
         "schema": SCHEMA, "status": "INCOMPLETE", "training_ready": False,
     })
     prior = output / "WU20H_sequential_PRIVATE.json"
+    archive = output / "superseded_NOT_CURRENT"
+    if prior.is_symlink() or archive.is_symlink():
+        raise ValueError("Refusing symlinked prior/archived report")
     if prior.exists():
-        archive = output / "superseded_NOT_CURRENT"
         archive.mkdir(exist_ok=True)
         now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
         os.replace(prior, archive / f"WU20H_sequential_{now}_OLD_PRIVATE.json")
