@@ -41,7 +41,7 @@ def read_json(path: Path) -> dict:
     with path.open(encoding="utf-8") as stream:
         obj = json.load(stream)
     if not isinstance(obj, dict):
-        raise ValueError(f"Expected object: {path.name}")
+        raise TypeError(f"Expected object: {path.name}")
     return obj
 
 
@@ -81,7 +81,7 @@ def verify_folds(fold_dir: Path, frozen_splits: Path) -> dict:
                 or set(heldout or []) != set(original.get("val", []))):
             raise ValueError(f"Fold {fold} does not match immutable five-fold split")
         if not isinstance(train, list) or not isinstance(heldout, list):
-            raise ValueError(f"Fold {fold}: missing case inventory")
+            raise TypeError(f"Fold {fold}: missing case inventory")
         if (len(train) != (120 if fold == 4 else 119)
                 or len(heldout) != (29 if fold == 4 else 30)
                 or len(train) != len(set(train)) or len(heldout) != len(set(heldout))
