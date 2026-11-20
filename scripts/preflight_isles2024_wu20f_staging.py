@@ -14,13 +14,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
-
-from hybridstrokeseg.wu20_fold_preprocessing import CHANNELS, FROZEN_SPLIT_SHA, file_sha256, validated_split
 from qualify_isles2024_nnunet_runtime import (
     SOURCE_PLANS_SHA,
     assert_locked_plans,
     build_locked_plans,
     validate_locked_fold_manifest,
+)
+
+from hybridstrokeseg.wu20_fold_preprocessing import (
+    CHANNELS,
+    FROZEN_SPLIT_SHA,
+    file_sha256,
+    validated_split,
 )
 
 SCHEMA = "WU20F-virtual-staging-v1"
@@ -240,7 +245,7 @@ def run_preflight(raw: Path, splits: Path, plans: Path, folds: Path, gate: Path,
                 status = "CHECKED"
             completed.append(case)
             print(f"[{i:03d}/149] {case}: {status}", flush=True)
-        except Exception as exc:
+        except (OSError, ValueError, TypeError, KeyError, RuntimeError) as exc:
             # Do not silently exclude a patient or proceed with a partial cohort.
             errors.append({"case_id_PRIVATE": case, "error_type": type(exc).__name__,
                            "message": str(exc)[:220]})
