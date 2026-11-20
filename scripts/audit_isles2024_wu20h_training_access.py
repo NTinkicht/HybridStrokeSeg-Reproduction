@@ -65,9 +65,8 @@ def inspect_trace(events: list[dict], train_ids: set[str], outer_ids: set[str]) 
             if not archived or predictions_sealed or inference_seen != outer_ids:
                 raise ValueError("Cannot seal incomplete heldout predictions")
             predictions_sealed = True
-        elif kind == "outer_evaluation_label_open":
-            if not predictions_sealed or case not in outer_ids:
-                raise ValueError("Heldout lesion label accessed before predictions were sealed")
+        elif kind == "outer_evaluation_label_open" and (not predictions_sealed or case not in outer_ids):
+            raise ValueError("Heldout lesion label accessed before predictions were sealed")
     if not final_written or not archived or not predictions_sealed:
         raise ValueError("Final epoch, archive and predictions seal required")
     return {
