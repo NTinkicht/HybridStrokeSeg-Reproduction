@@ -6,14 +6,14 @@ from pathlib import Path
 
 import nibabel as nib
 import numpy as np
-
-from hybridstrokeseg.wu20_fold_preprocessing import file_sha256
 from stage_isles2024_wu20g_physical import (
     make_synthetic_inputs,
     stage_synthetic_case,
     synthetic_parameters,
     verify_written_case,
 )
+
+from hybridstrokeseg.wu20_fold_preprocessing import file_sha256
 
 
 def main() -> None:
