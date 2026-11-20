@@ -116,6 +116,41 @@ def test_protect_output_rejects_overwrite_and_symlink(tmp_path):
     h.protect_outputs(tmp_path / "report", scratch, [src])
 
 
+def test_atomic_report_rejects_temp_symlink_without_touching_evidence(tmp_path):
+    evidence = tmp_path / "immutable_original.json"
+    evidence.write_text("DO NOT MODIFY")
+    output = tmp_path / "private_results"
+    output.mkdir()
+    (output / "WU20H_sequential_aggregate.json.tmp").symlink_to(evidence)
+    target = output / "WU20H_sequential_aggregate.json"
+    h.atomic_json(target, {"status": "INCOMPLETE", "training_ready": False})
+    assert evidence.read_text() == "DO NOT MODIFY"
+    assert json.loads(target.read_text())["status"] == "INCOMPLETE"
+    assert (output / "WU20H_sequential_aggregate.json.tmp").is_symlink()
+    target.unlink()
+    target.symlink_to(evidence)
+    with pytest.raises(ValueError, match="symlinked report"):
+        h.atomic_json(target, {"status": "INCOMPLETE"})
+    assert evidence.read_text() == "DO NOT MODIFY"
+
+
+def test_archive_symlink_cannot_redirect_private_report(tmp_path, monkeypatch):
+    output = tmp_path / "out"
+    output.mkdir()
+    sink = tmp_path / "protected"
+    sink.mkdir()
+    (output / "superseded_NOT_CURRENT").symlink_to(sink, target_is_directory=True)
+    h.atomic_json(output / "WU20H_sequential_PRIVATE.json", {"prior": True})
+    dummy = tmp_path / "dummy.json"
+    dummy.write_text("{}")
+    monkeypatch.setattr(h, "protect_outputs", lambda *_: None)
+    with pytest.raises(ValueError, match="symlinked prior/archived"):
+        h.create_plan(dummy, dummy, dummy, dummy, dummy, dummy,
+                      dummy, dummy, tmp_path, tmp_path, output)
+    assert json.loads((output / "WU20H_sequential_aggregate.json").read_text())["status"] == "INCOMPLETE"
+    assert list(sink.iterdir()) == []
+
+
 def test_review_status_does_not_authenticate_approvals(tmp_path):
     csv_path = tmp_path / "review.csv"
     with csv_path.open("w", encoding="utf8", newline="") as f:
@@ -205,5 +240,7 @@ def test_notebook27_pin_and_no_live_action():
         if cell["cell_type"] == "code":
             ast.parse("".join(cell["source"]))
     assert "--mode', 'plan'" in code or "--mode','plan'" in code
+    assert "tempfile.mkstemp(" in code
+    assert code.index("WU20H_sequential_aggregate.json") < code.index("assert sha256(SPLITS)")
     for item in ("__WU20H_COMMIT__", "nnUNetv2_train", "torch.cuda", "--mode','stage'"):
         assert item not in code
