@@ -69,3 +69,8 @@ jobs:
         env:
           PYTHONPATH: src:scripts
         run: python tests/smoke_wu20d_full_native_io.py
+
+      - name: Verify WU20G paired synthetic physical staging and label isolation
+        env:
+          PYTHONPATH: src:scripts
+        run: python tests/smoke_wu20g_nifti.py
