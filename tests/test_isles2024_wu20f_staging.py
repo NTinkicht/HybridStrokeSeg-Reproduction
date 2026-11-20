@@ -13,8 +13,8 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(SCRIPTS))
 
 # Import study script without needing real patient NIfTI data.
-import preflight_isles2024_wu20f_staging as preflight  # noqa: E402
-import qualify_isles2024_wu20f_synthetic_forward as forward  # noqa: E402
+import preflight_isles2024_wu20f_staging as preflight
+import qualify_isles2024_wu20f_synthetic_forward as forward
 
 
 def test_virtual_inventory_for_every_fold():
