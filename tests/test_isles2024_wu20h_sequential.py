@@ -250,7 +250,7 @@ def test_notebook27_rejects_pinned_source_symlink(tmp_path):
         "urllib": urllib, "sha256": lambda _: "never_reached",
     }
     with pytest.raises(ValueError, match="symlinked pinned-source path"):
-        exec(download, context)
+        exec(download, context)  # noqa: S102 - execute checked-in notebook against synthetic fixture
     assert protected.read_text() == "IMMUTABLE"
 
 
