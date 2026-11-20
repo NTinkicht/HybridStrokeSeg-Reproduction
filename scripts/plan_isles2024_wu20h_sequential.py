@@ -79,7 +79,7 @@ def frozen_memberships(path: Path) -> list[tuple[set[str], set[str]]]:
     universe = result[0][0] | result[0][1]
     if len(universe) != 149 or any(tr | val != universe for tr, val in result):
         raise ValueError("Inconsistent 149-case frozen universe")
-    if len(set().union(*(v for _, v in result))) != 149 or sum(map(lambda x: len(x[1]), result)) != 149:
+    if len(set().union(*(v for _, v in result))) != 149 or sum(len(partition[1]) for partition in result) != 149:
         raise ValueError("Outer held-out patient appears twice")
     return result
 
