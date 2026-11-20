@@ -75,7 +75,7 @@ def run_forward(source_plans: Path, output: Path) -> dict:
         with torch.inference_mode():
             logits = network(tensor)
         if isinstance(logits, (list, tuple)):
-            raise ValueError("Deep supervision unexpectedly active in synthetic inference")
+            raise TypeError("Deep supervision unexpectedly active in synthetic inference")
         expected = (1, 2, *SMALL_PATCH)
         if tuple(logits.shape) != expected or not torch.isfinite(logits).all().item():
             raise ValueError(f"Dataset{dataset} nonfinite or invalid forward logits")
