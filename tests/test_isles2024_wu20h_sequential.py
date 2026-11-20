@@ -229,6 +229,31 @@ def test_training_trace_adversarial_fail_closed(tamper):
         trace.inspect_trace(events, set(train), set(heldout))
 
 
+def test_notebook27_rejects_pinned_source_symlink(tmp_path):
+    import os
+    import tempfile
+    import urllib.request
+
+    notebook = Path(__file__).resolve().parents[1] / "notebooks" / (
+        "27_ISLES2024_WU20H_SEQUENTIAL_RELEASE_HOLD.ipynb"
+    )
+    data = json.loads(notebook.read_text(encoding="utf8"))
+    download = "".join(data["cells"][5]["source"])
+    pinned = tmp_path / "pinned_source"
+    scripts = pinned / "scripts"
+    scripts.mkdir(parents=True)
+    protected = tmp_path / "sensitive_source.json"
+    protected.write_text("IMMUTABLE")
+    (scripts / "plan_isles2024_wu20h_sequential.py").symlink_to(protected)
+    context = {
+        "SOURCE": pinned, "os": os, "tempfile": tempfile,
+        "urllib": urllib, "sha256": lambda _: "never_reached",
+    }
+    with pytest.raises(ValueError, match="symlinked pinned-source path"):
+        exec(download, context)
+    assert protected.read_text() == "IMMUTABLE"
+
+
 def test_notebook27_pin_and_no_live_action():
     path = Path(__file__).resolve().parents[1] / "notebooks" / "27_ISLES2024_WU20H_SEQUENTIAL_RELEASE_HOLD.ipynb"
     if not path.exists():
@@ -242,5 +267,7 @@ def test_notebook27_pin_and_no_live_action():
     assert "--mode', 'plan'" in code or "--mode','plan'" in code
     assert "tempfile.mkstemp(" in code
     assert code.index("WU20H_sequential_aggregate.json") < code.index("assert sha256(SPLITS)")
+    assert "Refusing symlinked pinned-source path" in code
+    assert "Refusing symlinked synthetic audit destination" in code
     for item in ("__WU20H_COMMIT__", "nnUNetv2_train", "torch.cuda", "--mode','stage'"):
         assert item not in code
